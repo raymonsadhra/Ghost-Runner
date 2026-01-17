@@ -15,6 +15,7 @@ const DEFAULT_REGION = {
   latitudeDelta: 0.01,
   longitudeDelta: 0.01,
 };
+const GHOST_HEAD_START_MS = 10000;
 
 function getInitialRegion(points) {
   if (!points.length) return DEFAULT_REGION;
@@ -45,6 +46,7 @@ export default function GhostRunScreen({ navigation, route }) {
   const [duration, setDuration] = useState(0);
   const [distance, setDistance] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
+  const ghostActive = duration >= GHOST_HEAD_START_MS / 1000;
 
   const handlePoint = useCallback((point, allPoints) => {
     const nextPoints = [...allPoints];
@@ -90,15 +92,27 @@ export default function GhostRunScreen({ navigation, route }) {
       const elapsedSeconds = Math.floor(elapsedMs / 1000);
       setDuration(elapsedSeconds);
 
-      const ghostPos = ghostRacerRef.current.getGhostPosition(elapsedMs);
+      const ghostElapsedMs = Math.max(0, elapsedMs - GHOST_HEAD_START_MS);
+      const ghostActive = elapsedMs >= GHOST_HEAD_START_MS;
+
+      const ghostPos = ghostActive
+        ? ghostRacerRef.current.getGhostPosition(ghostElapsedMs)
+        : null;
       setGhostPosition(ghostPos);
 
-      const currentDelta = ghostRacerRef.current.calculateDelta(
-        userPointsRef.current,
-        elapsedMs
-      );
-      setDelta(currentDelta);
-      audioManagerRef.current.updateAudio(currentDelta);
+      if (ghostActive) {
+        audioManagerRef.current.setAlwaysOn(true);
+        const currentDelta = ghostRacerRef.current.calculateDelta(
+          userPointsRef.current,
+          ghostElapsedMs
+        );
+        setDelta(currentDelta);
+        audioManagerRef.current.updateAudio(currentDelta, { forceAmbient: true });
+      } else {
+        setDelta(0);
+        audioManagerRef.current.setAlwaysOn(false);
+        audioManagerRef.current.stopAll();
+      }
     }, 1000);
 
     return () => clearInterval(interval);
@@ -125,18 +139,20 @@ export default function GhostRunScreen({ navigation, route }) {
         followsUserLocation
         initialRegion={getInitialRegion(ghostRoute)}
       >
-        <Polyline
-          coordinates={ghostRoute}
-          strokeColor="rgba(233, 242, 244, 0.35)"
-          strokeWidth={3}
-          lineDashPattern={[10, 8]}
-        />
+        {ghostActive && (
+          <Polyline
+            coordinates={ghostRoute}
+            strokeColor={theme.colors.danger}
+            strokeWidth={3}
+            lineDashPattern={[10, 8]}
+          />
+        )}
         <Polyline
           coordinates={userPoints}
           strokeColor={theme.colors.secondary}
           strokeWidth={4}
         />
-        {ghostPosition && (
+        {ghostActive && ghostPosition && (
           <Marker coordinate={ghostPosition} title="Ghost">
             <View style={styles.ghostMarker} />
           </Marker>

@@ -5,10 +5,15 @@ export class AudioManager {
   constructor(sources = {}, { enableHaptics = true } = {}) {
     this.sources = sources;
     this.enableHaptics = enableHaptics;
+    this.alwaysOn = false;
     this.sounds = {};
     this.enabled = Object.values(sources).some(Boolean);
     this.lastHapticAt = 0;
     this.ready = this.init();
+  }
+
+  setAlwaysOn(value) {
+    this.alwaysOn = Boolean(value);
   }
 
   async init() {
@@ -30,14 +35,18 @@ export class AudioManager {
     this.sounds[key] = sound;
   }
 
-  async updateAudio(deltaMeters) {
+  async updateAudio(deltaMeters, { forceAmbient = this.alwaysOn } = {}) {
     if (!this.enabled) return;
     await this.ready;
 
     const distance = Math.abs(deltaMeters);
 
     if (deltaMeters < -50) {
-      await this.stopAll();
+      if (forceAmbient) {
+        await this.playAmbient();
+      } else {
+        await this.stopAll();
+      }
       return;
     }
 
@@ -65,7 +74,22 @@ export class AudioManager {
       return;
     }
 
+    if (deltaMeters < 60) {
+      await this.playFootsteps(0.2, 0.7);
+      return;
+    }
+
+    if (forceAmbient) {
+      await this.playAmbient();
+      return;
+    }
+
     await this.stopAll();
+  }
+
+  async playAmbient() {
+    await this.playBreathing(0.35, 0);
+    await this.playFootsteps(0.25, 0);
   }
 
   async playBreathing(volume, pan) {

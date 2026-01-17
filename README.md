@@ -67,6 +67,7 @@ src/
 - `react-native-maps` may require platform-specific config for iOS and Android.
 - The ghost engine currently compares route distance by elapsed time.
 - Firebase Auth is not initialized yet; runs save with `userId: "anon"` until auth is wired.
+- Runs are stored locally in AsyncStorage and synced to Firestore when available.
 
 ## Expo Go + SDK compatibility
 - Expo Go on iOS only supports the latest SDK. This project targets SDK 54.
