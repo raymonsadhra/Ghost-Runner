@@ -1,0 +1,10 @@
+{
+  "expo": {
+    "name": "Ghost Runner",
+    "slug": "ghost-runner",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": ["**/*"]
+  }
+}
