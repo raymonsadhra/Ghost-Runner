@@ -89,7 +89,9 @@ service cloud.firestore {
       allow write: if request.auth != null && request.auth.uid == userId;
 
       match /Runs/{runId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        // Allow users to read their own runs, and allow authenticated users to read friends' runs
+        allow read: if request.auth != null;
+        allow write: if request.auth != null && request.auth.uid == userId;
       }
 
       match /Friends/{friendId} {
@@ -101,6 +103,42 @@ service cloud.firestore {
 
       match /FriendRequests/{requestId} {
         // Owner can read their requests. Sender (requestId) can create/delete on receiver.
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow create, delete: if request.auth != null &&
+          (request.auth.uid == userId || request.auth.uid == requestId);
+      }
+    }
+  }
+}
+```
+
+#### Option E: Friends-Only Runs (Most Secure - Requires Checking Friendship)
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /Users/{userId} {
+      // Allow read of user profiles for friend search / leaderboard.
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+
+      match /Runs/{runId} {
+        // Users can read their own runs
+        allow read: if request.auth != null && request.auth.uid == userId;
+        // Users can also read runs if they are friends with the user
+        // Note: This requires checking the Friends subcollection, which Firestore rules can't do directly
+        // For now, we allow all authenticated users to read runs (see Option D above)
+        // For stricter security, implement server-side checks in your app code
+        allow write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      match /Friends/{friendId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow create, delete: if request.auth != null &&
+          (request.auth.uid == userId || request.auth.uid == friendId);
+      }
+
+      match /FriendRequests/{requestId} {
         allow read: if request.auth != null && request.auth.uid == userId;
         allow create, delete: if request.auth != null &&
           (request.auth.uid == userId || request.auth.uid == requestId);

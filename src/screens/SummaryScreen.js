@@ -14,6 +14,8 @@ import MapView, { Polyline } from 'react-native-maps';
 import { theme } from '../theme';
 import { updateRunName } from '../services/firebaseService';
 import { awardBossRewards } from '../services/rewardService';
+import { formatDurationCompact } from '../utils/timeUtils';
+import { formatDistanceMiles, calculatePacePerMile } from '../utils/distanceUtils';
 import OutsiderBackground from '../components/OutsiderBackground';
 
 const DEFAULT_REGION = {
@@ -123,19 +125,18 @@ export default function SummaryScreen({ navigation, route }) {
             <Text style={styles.title}>Run Complete</Text>
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
-              <Text style={styles.statValue}>{(distance / 1000).toFixed(2)}</Text>
-              <Text style={styles.statLabel}>km</Text>
+              <Text style={styles.statValue}>{formatDistanceMiles(distance).replace(' mi', '')}</Text>
+              <Text style={styles.statLabel}>mi</Text>
             </View>
             <View style={styles.statCard}>
               <Text style={styles.statValue}>
-                {Math.floor(duration / 60)}:
-                {(duration % 60).toString().padStart(2, '0')}
+                {formatDurationCompact(duration)}
               </Text>
               <Text style={styles.statLabel}>time</Text>
             </View>
             <View style={styles.statCard}>
               <Text style={styles.statValue}>{pace.toFixed(2)}</Text>
-              <Text style={styles.statLabel}>min/km</Text>
+              <Text style={styles.statLabel}>min/mi</Text>
             </View>
           </View>
 
@@ -255,17 +256,23 @@ const styles = StyleSheet.create({
     bottom: theme.spacing.lg,
   },
   panel: {
-    backgroundColor: 'rgba(21, 19, 28, 0.92)',
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.lg,
+    backgroundColor: 'rgba(21, 19, 28, 0.95)',
+    borderRadius: 24,
+    padding: 24,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 10,
   },
   title: {
     color: theme.colors.text,
-    fontSize: 24,
-    fontWeight: '700',
-    marginBottom: theme.spacing.md,
+    fontSize: 32,
+    fontWeight: '900',
+    marginBottom: theme.spacing.lg,
+    letterSpacing: -0.5,
   },
   statsRow: {
     flexDirection: 'row',
@@ -273,18 +280,24 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: theme.colors.surfaceElevated,
-    borderRadius: theme.radius.md,
-    padding: theme.spacing.sm,
+    backgroundColor: 'rgba(29, 26, 38, 0.8)',
+    borderRadius: 16,
+    padding: 16,
     alignItems: 'center',
     marginRight: theme.spacing.sm,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   statValue: {
     color: theme.colors.text,
-    fontWeight: '700',
-    fontSize: 18,
+    fontWeight: '800',
+    fontSize: 22,
+    letterSpacing: -0.3,
   },
   statLabel: {
     color: theme.colors.textMuted,
@@ -357,9 +370,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   primaryButton: {
-    borderRadius: theme.radius.lg,
+    borderRadius: 18,
     marginBottom: theme.spacing.sm,
     overflow: 'hidden',
+    shadowColor: theme.colors.neonPink,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
   },
   primaryButtonInner: {
     paddingVertical: theme.spacing.md,

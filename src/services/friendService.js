@@ -227,6 +227,17 @@ export async function declineFriendRequest(fromUserId) {
   ]);
 }
 
+export async function cancelFriendRequest(toUserId) {
+  const currentUser = requireUser();
+  const currentUserId = currentUser.uid;
+  if (!toUserId) return;
+  // Cancel outgoing request - delete from both users' FriendRequests
+  await Promise.all([
+    deleteDoc(doc(db, 'Users', currentUserId, 'FriendRequests', toUserId)),
+    deleteDoc(doc(db, 'Users', toUserId, 'FriendRequests', currentUserId)),
+  ]);
+}
+
 export async function fetchPendingRequests() {
   const currentUser = requireUser();
   const currentUserId = currentUser.uid;

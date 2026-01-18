@@ -9,6 +9,8 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { getUserRuns } from '../services/firebaseService';
+import { formatDurationCompact } from '../utils/timeUtils';
+import { formatDistanceKmToMiles, calculatePacePerMile } from '../utils/distanceUtils';
 import { theme } from '../theme';
 import OutsiderBackground from '../components/OutsiderBackground';
 
@@ -33,16 +35,17 @@ function getRunTitle(run) {
 }
 
 function buildRunMeta(run, includeDate) {
-  const distanceKm = run.distanceKm ?? (run.distance ?? 0) / 1000;
-  const durationMin = run.durationMin ?? Math.floor((run.duration ?? 0) / 60);
-  const pace = distanceKm > 0 ? (run.duration ?? 0) / 60 / distanceKm : (run.pace ?? 0);
+  const distanceMeters = run.distance ?? (run.distanceKm ? run.distanceKm * 1000 : 0);
+  const durationSeconds = run.duration ?? (run.durationMin ?? 0) * 60;
+  const pace = calculatePacePerMile(durationSeconds, distanceMeters);
+  const distanceMiles = distanceMeters * 0.000621371;
   const parts = [];
   if (includeDate) {
     parts.push(formatDate(run.timestamp));
   }
-  parts.push(`${distanceKm.toFixed(2)} km`);
-  parts.push(`${durationMin} min`);
-  parts.push(`Pace ${pace.toFixed(2)} min/km`);
+  parts.push(`${distanceMiles.toFixed(2)} mi`);
+  parts.push(formatDurationCompact(durationSeconds));
+  parts.push(`Pace ${pace.toFixed(2)} min/mi`);
   return parts.join(' • ');
 }
 
@@ -198,8 +201,9 @@ const styles = StyleSheet.create({
   },
   title: {
     color: theme.colors.text,
-    fontSize: 22,
-    fontWeight: '700',
+    fontSize: 28,
+    fontWeight: '900',
+    letterSpacing: -0.5,
   },
   subtitle: {
     color: theme.colors.textMuted,
@@ -217,22 +221,30 @@ const styles = StyleSheet.create({
     paddingBottom: theme.spacing.xl,
   },
   card: {
-    backgroundColor: CARD_BG,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.lg,
-    marginBottom: theme.spacing.md,
+    backgroundColor: 'rgba(29, 26, 38, 0.6)',
+    borderRadius: 18,
+    padding: 20,
+    marginBottom: 14,
     borderWidth: 1,
-    borderColor: CARD_BORDER,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   cardTitle: {
     color: theme.colors.text,
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 19,
+    fontWeight: '800',
+    marginBottom: 8,
+    letterSpacing: -0.2,
   },
   cardMeta: {
     color: theme.colors.textMuted,
     fontSize: 14,
-    marginTop: 6,
+    marginTop: 4,
+    fontWeight: '500',
   },
   emptyCard: {
     backgroundColor: CARD_BG,

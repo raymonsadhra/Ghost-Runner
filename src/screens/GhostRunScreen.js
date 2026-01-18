@@ -6,6 +6,7 @@ import { LocationTracker } from '../services/LocationTracker';
 import { GhostRacer } from '../services/GhostRacer';
 import { AudioManager } from '../services/AudioManager';
 import { calculateTotalDistance } from '../utils/geoUtils';
+import { formatDurationCompact } from '../utils/timeUtils';
 import { generatePowerUps, pickPowerUpInRange } from '../services/powerUpService';
 import { theme } from '../theme';
 import { audioSources } from '../config/audioSources';
@@ -93,7 +94,7 @@ export default function GhostRunScreen({ navigation, route }) {
   );
   const bossTrailColor = bossPalette?.trail ?? PRIMARY_BLUE;
   const bossAccent = bossPalette?.primary ?? PRIMARY_BLUE;
-  const pace = distance > 0 ? (duration / 60) / (distance / 1000) : 0;
+  const pace = calculatePacePerMile(duration, distance);
 
   const trackerRef = useRef(new LocationTracker());
   const ghostRacerRef = useRef(new GhostRacer(ghostRoute));
@@ -465,20 +466,19 @@ export default function GhostRunScreen({ navigation, route }) {
           <View style={styles.hudStatBlock}>
             <Text style={styles.hudLabel}>Time</Text>
             <Text style={styles.hudValue}>
-              {Math.floor(duration / 60)}:
-              {(duration % 60).toString().padStart(2, '0')}
+              {formatDurationCompact(duration)}
             </Text>
           </View>
           <View style={styles.hudStatBlock}>
             <Text style={styles.hudLabel}>Distance</Text>
             <Text style={styles.hudValue}>
-              {(distance / 1000).toFixed(2)} km
+              {formatDistanceMiles(distance).replace(' mi', '')} mi
             </Text>
           </View>
           <View style={styles.hudStatBlock}>
             <Text style={styles.hudLabel}>Pace</Text>
             <Text style={styles.hudValue}>
-              {pace > 0 ? pace.toFixed(2) : '0.00'} /km
+              {pace > 0 ? pace.toFixed(2) : '0.00'} /mi
             </Text>
           </View>
         </View>

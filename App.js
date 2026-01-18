@@ -16,12 +16,15 @@ import GhostRunScreen from './src/screens/GhostRunScreen';
 import SummaryScreen from './src/screens/SummaryScreen';
 import RunHistoryScreen from './src/screens/RunHistoryScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
+import AnalyticsScreen from './src/screens/AnalyticsScreen';
 import LeaderboardScreen from './src/screens/LeaderboardScreen';
 import UserRunHistoryScreen from './src/screens/UserRunHistoryScreen';
 import FriendsScreen from './src/screens/FriendsScreen';
 
 import { theme } from './src/theme';
 import { audioSources } from './src/config/audioSources';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 // import GlassTabBar from './src/components/GlassTabBar';
 
 const Stack = createStackNavigator();
@@ -458,6 +461,7 @@ function ProfileStack() {
       }}
     >
       <Stack.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Analytics" component={AnalyticsScreen} options={{ title: 'Analytics' }} />
     </Stack.Navigator>
   );
 }
@@ -496,9 +500,180 @@ function FriendsStack() {
       }}
     >
       <Stack.Screen name="Friends" component={FriendsScreen} options={{ headerShown: false }} />
+      <Stack.Screen
+        name="UserRunHistory"
+        component={UserRunHistoryScreen}
+        options={({ route }) => ({
+          title: `${route.params?.userName ?? 'Runner'}'s Runs`,
+          headerShown: true,
+        })}
+      />
     </Stack.Navigator>
   );
 }
+
+// --------- Custom Tab Bar ---------
+function CustomTabBar({ state, descriptors, navigation }) {
+  // Get the current route name from the active tab's stack
+  const getCurrentRouteName = () => {
+    const activeTab = state.routes[state.index];
+    if (activeTab?.state?.routes) {
+      const stackState = activeTab.state;
+      const stackRoute = stackState.routes[stackState.index];
+      return stackRoute?.name;
+    }
+    return null;
+  };
+
+  const currentRouteName = getCurrentRouteName();
+  // Hide tab bar on map screens
+  const mapScreens = ['Run', 'GhostRun', 'Summary'];
+  const shouldHideTabBar = mapScreens.includes(currentRouteName);
+
+  if (shouldHideTabBar) {
+    return null;
+  }
+
+  return (
+    <View style={customTabBarStyles.container}>
+      {/* Tab Bar with Blur Effect */}
+      <BlurView intensity={80} tint="dark" style={customTabBarStyles.blurContainer}>
+        <View style={customTabBarStyles.tabBar}>
+        {state.routes.map((route, index) => {
+          const { options } = descriptors[route.key];
+          const label =
+            options.tabBarLabel !== undefined
+              ? options.tabBarLabel
+              : options.title !== undefined
+              ? options.title
+              : route.name;
+
+          const isFocused = state.index === index;
+
+          const onPress = () => {
+            const event = navigation.emit({
+              type: 'tabPress',
+              target: route.key,
+              canPreventDefault: true,
+            });
+
+            if (!isFocused && !event.defaultPrevented) {
+              navigation.navigate(route.name);
+            }
+          };
+
+          const onLongPress = () => {
+            navigation.emit({
+              type: 'tabLongPress',
+              target: route.key,
+            });
+          };
+
+          const icon = options.tabBarIcon
+            ? options.tabBarIcon({ color: isFocused ? theme.colors.neonPink : theme.colors.textMuted, focused: isFocused })
+            : null;
+
+          return (
+            <TouchableOpacity
+              key={route.key}
+              accessibilityRole="button"
+              accessibilityState={isFocused ? { selected: true } : {}}
+              accessibilityLabel={options.tabBarAccessibilityLabel}
+              testID={options.tabBarTestID}
+              onPress={onPress}
+              onLongPress={onLongPress}
+              style={[
+                customTabBarStyles.tabButton,
+                isFocused && customTabBarStyles.tabButtonActive,
+              ]}
+              activeOpacity={0.7}
+            >
+              <View style={[
+                customTabBarStyles.iconContainer,
+                isFocused && customTabBarStyles.iconContainerActive,
+              ]}>
+                {icon}
+              </View>
+              <Text
+                style={[
+                  customTabBarStyles.tabLabel,
+                  isFocused && customTabBarStyles.tabLabelActive,
+                ]}
+              >
+                {label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+        </View>
+      </BlurView>
+    </View>
+  );
+}
+
+const customTabBarStyles = StyleSheet.create({
+  container: {
+    position: 'absolute',
+    bottom: 8,
+    left: 20,
+    right: 20,
+    backgroundColor: 'transparent',
+  },
+  blurContainer: {
+    borderRadius: 32,
+    overflow: 'hidden',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(11, 10, 14, 0.4)',
+    paddingTop: 6,
+    paddingBottom: 8,
+    paddingHorizontal: 4,
+    minHeight: 52,
+  },
+  tabButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginHorizontal: 2,
+  },
+  tabButtonActive: {
+    backgroundColor: 'rgba(255, 45, 122, 0.25)',
+    borderRadius: 30,
+  },
+  iconContainer: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+    backgroundColor: 'transparent',
+  },
+  iconContainerActive: {
+    backgroundColor: 'rgba(255, 45, 122, 0.3)',
+  },
+  tabLabel: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: theme.colors.textMuted,
+    marginTop: 1,
+  },
+  tabLabelActive: {
+    color: theme.colors.neonPink,
+    fontWeight: '700',
+    fontSize: 9,
+  },
+});
 
 // --------- Main App ---------
 export default function App() {
@@ -530,13 +705,10 @@ export default function App() {
             key={user.uid} // Force remount when user changes
             screenOptions={{
               headerShown: false,
-              tabBarActiveTintColor: theme.colors.primary,
-              tabBarInactiveTintColor: theme.colors.mist,
-              tabBarStyle: {
-                backgroundColor: theme.colors.ink,
-                borderTopWidth: 0,
-              },
+              tabBarActiveTintColor: theme.colors.neonPink,
+              tabBarInactiveTintColor: theme.colors.textMuted,
             }}
+            tabBar={(props) => <CustomTabBar {...props} />}
           >
             <Tab.Screen
               name="HomeTab"

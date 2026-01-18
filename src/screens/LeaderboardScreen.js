@@ -10,6 +10,9 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { theme } from '../theme';
 import { fetchFriends } from '../services/friendService';
+import { getUser } from '../services/firebaseService';
+import { auth } from '../firebase';
+import { formatDistanceKmToMiles } from '../utils/distanceUtils';
 import OutsiderBackground from '../components/OutsiderBackground';
 
 const CARD_BG = theme.colors.surfaceElevated;
@@ -27,24 +30,60 @@ export default function LeaderboardScreen({ navigation }) {
       const loadLeaderboard = async () => {
         setIsLoading(true);
         try {
-          const friends = await fetchFriends();
-          const leaderboardData = friends
-            .map((friend) => ({
-              id: friend.id,
-              userId: friend.id,
-              name: friend.displayName ?? friend.name ?? 'Runner',
-              distance: (friend.totalDistance ?? 0) / 1000,
-              runs: friend.totalRuns ?? 0,
-            }))
+          const currentUserId = auth?.currentUser?.uid;
+          const [friends, currentUser] = await Promise.all([
+            fetchFriends(),
+            currentUserId ? getUser(currentUserId).catch(() => null) : null,
+          ]);
+
+          // Build leaderboard entries from friends
+          const friendEntries = friends.map((friend) => ({
+            id: friend.id,
+            userId: friend.id,
+            name: friend.displayName ?? friend.name ?? 'Runner',
+            distance: (friend.totalDistance ?? 0) * 0.000621371, // Convert meters to miles
+            runs: friend.totalRuns ?? 0,
+            isCurrentUser: false,
+          }));
+
+          // Add current user to leaderboard if they exist
+          const allEntries = [...friendEntries];
+          if (currentUser && currentUserId) {
+            const currentUserEntry = {
+              id: currentUserId,
+              userId: currentUserId,
+              name: currentUser.name ?? currentUser.displayName ?? 'You',
+              distance: (currentUser.totalDistance ?? 0) * 0.000621371, // Convert meters to miles
+              runs: currentUser.totalRuns ?? 0,
+              isCurrentUser: true,
+            };
+            // Only add if not already in friends list
+            const isAlreadyInList = friendEntries.some((f) => f.id === currentUserId);
+            if (!isAlreadyInList) {
+              allEntries.push(currentUserEntry);
+            } else {
+              // Mark the existing entry as current user
+              const existingIndex = allEntries.findIndex((e) => e.id === currentUserId);
+              if (existingIndex >= 0) {
+                allEntries[existingIndex].isCurrentUser = true;
+                allEntries[existingIndex].name = currentUser.name ?? currentUser.displayName ?? 'You';
+              }
+            }
+          }
+
+          // Sort by distance and assign ranks
+          const leaderboardData = allEntries
             .sort((a, b) => b.distance - a.distance)
             .map((entry, index) => ({
               ...entry,
               rank: index + 1,
             }));
+
           if (active) {
             setLeaderboard(leaderboardData);
           }
         } catch (error) {
+          console.error('Error loading leaderboard:', error);
           if (active) {
             setLeaderboard([]);
           }
@@ -127,7 +166,7 @@ export default function LeaderboardScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-        <ScrollView contentContainerStyle={styles.container}>
+        <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 100 }]}>
         {isLoading ? (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyText}>Loading leaderboard...</Text>
@@ -142,13 +181,18 @@ export default function LeaderboardScreen({ navigation }) {
           leaderboard.map((entry) => (
             <TouchableOpacity
               key={entry.id}
-              style={styles.leaderboardCard}
+              style={[
+                styles.leaderboardCard,
+                entry.isCurrentUser && styles.currentUserCard,
+              ]}
               activeOpacity={0.7}
               onPress={() =>
-                navigation.navigate('UserRunHistory', {
-                  userId: entry.userId ?? entry.id,
-                  userName: entry.name ?? 'Runner',
-                })
+                entry.isCurrentUser
+                  ? navigation.getParent()?.navigate('ProfileTab')
+                  : navigation.navigate('UserRunHistory', {
+                      userId: entry.userId ?? entry.id,
+                      userName: entry.name ?? 'Runner',
+                    })
               }
             >
               <View style={styles.rankContainer}>
@@ -161,9 +205,11 @@ export default function LeaderboardScreen({ navigation }) {
                   </Text>
                 </View>
                 <View style={styles.userDetails}>
-                  <Text style={styles.userName}>{entry.name}</Text>
+                  <Text style={[styles.userName, entry.isCurrentUser && styles.currentUserName]}>
+                    {entry.isCurrentUser ? 'You' : entry.name}
+                  </Text>
                   <Text style={styles.userStats}>
-                    {entry.runs} runs • {entry.distance.toFixed(1)} km
+                    {entry.runs} runs • {entry.distance.toFixed(1)} mi
                   </Text>
                 </View>
               </View>
@@ -172,7 +218,7 @@ export default function LeaderboardScreen({ navigation }) {
                   <Text style={styles.distanceValue}>
                     {entry.distance.toFixed(1)}
                   </Text>
-                  <Text style={styles.distanceLabel}>km</Text>
+                  <Text style={styles.distanceLabel}>mi</Text>
                 </View>
                 <Text style={styles.chevron}>›</Text>
               </View>
@@ -196,9 +242,10 @@ const styles = StyleSheet.create({
     paddingBottom: theme.spacing.sm,
   },
   headerTitle: {
-    fontSize: 28,
-    fontWeight: '700',
+    fontSize: 36,
+    fontWeight: '900',
     color: theme.colors.text,
+    letterSpacing: -0.5,
   },
   filterContainer: {
     flexDirection: 'row',
@@ -208,25 +255,35 @@ const styles = StyleSheet.create({
   },
   filterButton: {
     flex: 1,
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.radius.md,
-    backgroundColor: CARD_BG,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    borderRadius: 14,
+    backgroundColor: 'rgba(29, 26, 38, 0.6)',
     borderWidth: 1,
-    borderColor: CARD_BORDER,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   filterButtonActive: {
     backgroundColor: theme.colors.neonPink,
     borderColor: theme.colors.neonPink,
+    shadowColor: theme.colors.neonPink,
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 5,
   },
   filterText: {
     color: theme.colors.textMuted,
     fontWeight: '600',
-    fontSize: 14,
+    fontSize: 15,
   },
   filterTextActive: {
     color: theme.colors.text,
+    fontWeight: '700',
   },
   container: {
     padding: theme.spacing.lg,
@@ -235,12 +292,26 @@ const styles = StyleSheet.create({
   leaderboardCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: CARD_BG,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.sm,
+    backgroundColor: 'rgba(29, 26, 38, 0.6)',
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 12,
     borderWidth: 1,
-    borderColor: CARD_BORDER,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  currentUserCard: {
+    borderWidth: 2,
+    borderColor: theme.colors.neonPink,
+    backgroundColor: 'rgba(255, 45, 122, 0.15)',
+    shadowColor: theme.colors.neonPink,
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   rankContainer: {
     width: 40,
@@ -276,23 +347,30 @@ const styles = StyleSheet.create({
   },
   userName: {
     color: theme.colors.text,
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  currentUserName: {
+    color: theme.colors.neonPink,
+    fontWeight: '900',
   },
   userStats: {
     color: theme.colors.textMuted,
-    fontSize: 12,
-    marginTop: 2,
+    fontSize: 13,
+    marginTop: 4,
+    fontWeight: '500',
   },
   distanceContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   distanceValue: {
     color: theme.colors.text,
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.3,
   },
   distanceLabel: {
     color: theme.colors.textMuted,

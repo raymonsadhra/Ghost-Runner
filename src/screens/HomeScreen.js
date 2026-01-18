@@ -12,7 +12,9 @@ import { useFocusEffect } from '@react-navigation/native';
 import { theme } from '../theme';
 import { getUserRuns } from '../services/firebaseService';
 import { auth } from '../firebase';
-import { DEFAULT_WEEKLY_GOAL_KM, loadWeeklyGoal, saveWeeklyGoal } from '../services/goalService';
+import { formatDurationCompact } from '../utils/timeUtils';
+import { formatDistanceKmToMiles, calculatePacePerMile } from '../utils/distanceUtils';
+import { DEFAULT_WEEKLY_GOAL_MILES, loadWeeklyGoal, saveWeeklyGoal } from '../services/goalService';
 import OutsiderBackground from '../components/OutsiderBackground';
 
 const CARD_BG = theme.colors.surfaceElevated;
@@ -32,8 +34,8 @@ function getWeekStart(timestamp) {
 export default function HomeScreen({ navigation }) {
   const [runs, setRuns] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [goalKm, setGoalKm] = useState(DEFAULT_WEEKLY_GOAL_KM);
-  const [selectedGoalKm, setSelectedGoalKm] = useState(DEFAULT_WEEKLY_GOAL_KM);
+  const [goalMiles, setGoalMiles] = useState(DEFAULT_WEEKLY_GOAL_MILES);
+  const [selectedGoalMiles, setSelectedGoalMiles] = useState(DEFAULT_WEEKLY_GOAL_MILES);
   const [isSavingGoal, setIsSavingGoal] = useState(false);
 
   useFocusEffect(
@@ -80,8 +82,8 @@ export default function HomeScreen({ navigation }) {
     const loadGoal = async () => {
       const storedGoal = await loadWeeklyGoal();
       if (active) {
-        setGoalKm(storedGoal);
-        setSelectedGoalKm(storedGoal);
+        setGoalMiles(storedGoal);
+        setSelectedGoalMiles(storedGoal);
       }
     };
 
@@ -94,13 +96,13 @@ export default function HomeScreen({ navigation }) {
   const summary = useMemo(() => {
     const weekStart = getWeekStart(Date.now());
     const weekRuns = runs.filter((run) => (run.timestamp ?? 0) >= weekStart);
-    const distance = weekRuns.reduce((sum, run) => {
+    const distanceMeters = weekRuns.reduce((sum, run) => {
       // Use distanceKm if available, otherwise convert distance from meters
       const runDistance = run.distanceKm ? run.distanceKm * 1000 : (run.distance ?? 0);
       return sum + runDistance;
     }, 0);
     return {
-      distanceKm: distance / 1000,
+      distanceMiles: distanceMeters * 0.000621371,
       count: weekRuns.length,
       prs: 0,
     };
@@ -111,9 +113,9 @@ export default function HomeScreen({ navigation }) {
     () => Array.from({ length: 50 }, (_, index) => index + 1),
     []
   );
-  const progressKm = Math.min(goalKm, summary.distanceKm);
-  const progressPercent = goalKm > 0 ? progressKm / goalKm : 0;
-  const isGoalCurrent = selectedGoalKm === goalKm;
+  const progressMiles = Math.min(goalMiles, summary.distanceMiles);
+  const progressPercent = goalMiles > 0 ? progressMiles / goalMiles : 0;
+  const isGoalCurrent = selectedGoalMiles === goalMiles;
 
   const handleSetGoal = async () => {
     if (isGoalCurrent || isSavingGoal) {
@@ -121,8 +123,8 @@ export default function HomeScreen({ navigation }) {
     }
     setIsSavingGoal(true);
     try {
-      const nextGoal = await saveWeeklyGoal(selectedGoalKm);
-      setGoalKm(nextGoal);
+      const nextGoal = await saveWeeklyGoal(selectedGoalMiles);
+      setGoalMiles(nextGoal);
     } finally {
       setIsSavingGoal(false);
     }
@@ -133,107 +135,13 @@ export default function HomeScreen({ navigation }) {
       <SafeAreaView style={styles.safe}>
         <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <TouchableOpacity style={styles.iconButton}>
-              <Text style={styles.iconText}>+</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.iconButton}>
-              <Text style={styles.iconText}>?</Text>
-            </TouchableOpacity>
-          </View>
           <Text style={styles.headerTitle}>Home</Text>
-          <View style={styles.headerRight}>
-            <TouchableOpacity
-              style={styles.iconButton}
-              onPress={() => {
-                // Navigate to Profile tab
-                try {
-                  const parent = navigation.getParent();
-                  if (parent) {
-                    parent.navigate('ProfileTab');
-                  }
-                } catch (error) {
-                  console.warn('Navigation error:', error);
-                }
-              }}
-            >
-              <Text style={styles.iconText}>Me</Text>
-            </TouchableOpacity>
-          </View>
         </View>
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Suggested Goal</Text>
-            <TouchableOpacity>
-              <Text style={styles.sectionLink}>Customize</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.goalCard}>
-            <View style={styles.goalIcon} />
-            <View style={styles.goalContent}>
-              <Text style={styles.goalTitle}>{goalKm} km per week</Text>
-              <Text style={styles.goalMeta}>
-                {progressKm.toFixed(1)} km / {goalKm} km run
-              </Text>
-              <View style={styles.goalProgress}>
-                <View
-                  style={[
-                    styles.goalProgressFill,
-                    { width: `${Math.round(progressPercent * 100)}%` },
-                  ]}
-                />
-              </View>
-            </View>
-            <TouchableOpacity
-              style={[styles.goalButton, isGoalCurrent && styles.goalButtonDisabled]}
-              onPress={handleSetGoal}
-              disabled={isGoalCurrent || isSavingGoal}
-            >
-              <Text style={styles.goalButtonText}>
-                {isGoalCurrent ? 'Goal Set' : isSavingGoal ? 'Saving...' : 'Set Goal'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.goalPicker}>
-            <Text style={styles.goalPickerLabel}>Pick a weekly target</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.goalScale}
-            >
-              <View style={styles.goalScaleLine} pointerEvents="none" />
-              {goalOptions.map((value) => {
-                const isActive = value === selectedGoalKm;
-                return (
-                  <TouchableOpacity
-                    key={value}
-                    onPress={() => setSelectedGoalKm(value)}
-                    style={styles.goalTick}
-                  >
-                    <Text style={[styles.goalTickText, isActive && styles.goalTickTextActive]}>
-                      {value}
-                    </Text>
-                    <View
-                      style={[
-                        styles.goalTickLine,
-                        isActive && styles.goalTickLineActive,
-                      ]}
-                    />
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.readyTitle}>Ready to get moving?</Text>
-          <Text style={styles.readyMeta}>
-            Choose a run and hit start. Your stats will be waiting.
-          </Text>
+        {/* Top Action Buttons */}
+        <View style={styles.topActionButtons}>
           <TouchableOpacity
-            style={styles.primaryAction}
+            style={styles.topPrimaryAction}
             onPress={() => navigation.navigate('Run')}
             activeOpacity={0.85}
           >
@@ -241,17 +149,169 @@ export default function HomeScreen({ navigation }) {
               colors={[theme.colors.neonPink, theme.colors.neonPurple]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.primaryActionInner}
+              style={styles.topActionInner}
             >
-              <Text style={styles.primaryActionText}>Record an Activity</Text>
+              <Text style={styles.topActionText}>Start Run</Text>
             </LinearGradient>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.secondaryAction}
+            style={styles.topSecondaryAction}
             onPress={() => navigation.navigate('GhostSelect')}
+            activeOpacity={0.85}
           >
-            <Text style={styles.secondaryActionText}>Race a Ghost</Text>
+            <Text style={styles.topSecondaryActionText}>Race Ghost</Text>
           </TouchableOpacity>
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Weekly Goal</Text>
+          </View>
+          
+          <View style={styles.goalCardWrapper}>
+            <LinearGradient
+              colors={['rgba(255, 45, 122, 0.2)', 'rgba(124, 92, 255, 0.15)']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.goalCard}
+            >
+              <View style={styles.goalContent}>
+                <View style={styles.goalHeader}>
+                  <View style={styles.goalValueContainer}>
+                    <Text style={styles.goalTitle}>{selectedGoalMiles}</Text>
+                    <Text style={styles.goalUnit}>miles</Text>
+                  </View>
+                  {isGoalCurrent && (
+                    <View style={styles.currentGoalIndicator}>
+                      <View style={styles.checkmarkCircle}>
+                        <Text style={styles.checkmark}>✓</Text>
+                      </View>
+                      <Text style={styles.currentGoalText}>Active</Text>
+                    </View>
+                  )}
+                </View>
+                
+                <Text style={styles.goalSubtitle}>Weekly target</Text>
+                
+                {isGoalCurrent && (
+                  <View style={styles.progressSection}>
+                    <View style={styles.progressHeader}>
+                      <Text style={styles.progressLabel}>Progress this week</Text>
+                      <View style={styles.progressPercentContainer}>
+                        <Text style={styles.progressPercent}>
+                          {Math.round(progressPercent * 100)}%
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.goalProgressContainer}>
+                      <View style={styles.goalProgress}>
+                        <LinearGradient
+                          colors={[theme.colors.neonGreen, theme.colors.neonBlue]}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 0 }}
+                          style={[
+                            styles.goalProgressFill,
+                            { width: `${Math.round(progressPercent * 100)}%` },
+                          ]}
+                        />
+                        {progressPercent > 0 && (
+                          <View
+                            style={[
+                              styles.progressDot,
+                              { left: `${Math.round(progressPercent * 100)}%` },
+                            ]}
+                          />
+                        )}
+                      </View>
+                    </View>
+                    <View style={styles.progressStats}>
+                      <View style={styles.progressStatItem}>
+                        <Text style={styles.progressStatValue}>{progressMiles.toFixed(1)}</Text>
+                        <Text style={styles.progressStatLabel}>Completed</Text>
+                      </View>
+                      <View style={styles.progressStatDivider} />
+                      <View style={styles.progressStatItem}>
+                        <Text style={styles.progressStatValue}>
+                          {Math.max(0, (goalMiles - progressMiles).toFixed(1))}
+                        </Text>
+                        <Text style={styles.progressStatLabel}>Remaining</Text>
+                      </View>
+                    </View>
+                  </View>
+                )}
+              </View>
+            </LinearGradient>
+          </View>
+
+          <View style={styles.goalPicker}>
+            <Text style={styles.goalPickerLabel}>Choose your weekly target</Text>
+            <View style={styles.goalPickerContainer}>
+              <View style={styles.goalScaleLine} pointerEvents="none" />
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.goalScale}
+                snapToInterval={60}
+                decelerationRate="fast"
+              >
+                {goalOptions.map((value) => {
+                  const isActive = value === selectedGoalMiles;
+                  const isMilestone = value % 5 === 0;
+                  return (
+                    <TouchableOpacity
+                      key={value}
+                      onPress={() => setSelectedGoalMiles(value)}
+                      style={[
+                        styles.goalTick,
+                        isActive && styles.goalTickActive,
+                      ]}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[
+                        styles.goalTickText,
+                        isActive && styles.goalTickTextActive,
+                        isMilestone && styles.goalTickTextMilestone,
+                      ]}>
+                        {value}
+                      </Text>
+                      <View
+                        style={[
+                          styles.goalTickLine,
+                          isActive && styles.goalTickLineActive,
+                          isMilestone && styles.goalTickLineMilestone,
+                        ]}
+                      />
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+            <TouchableOpacity
+              style={[
+                styles.goalButton,
+                isGoalCurrent && styles.goalButtonDisabled,
+                !isGoalCurrent && styles.goalButtonActive,
+              ]}
+              onPress={handleSetGoal}
+              disabled={isGoalCurrent || isSavingGoal}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={
+                  isGoalCurrent
+                    ? ['rgba(255, 255, 255, 0.12)', 'rgba(255, 255, 255, 0.06)']
+                    : [theme.colors.neonPink, theme.colors.neonPurple]
+                }
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.goalButtonGradient}
+              >
+                <Text style={styles.goalButtonText}>
+                  {isGoalCurrent ? '✓ Goal Active' : isSavingGoal ? 'Saving...' : 'Set This Goal'}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.section}>
@@ -269,9 +329,10 @@ export default function HomeScreen({ navigation }) {
             </View>
           ) : (
             recentRuns.map((run) => {
-              const distanceKm = run.distanceKm || (run.distance ?? 0) / 1000;
-              const durationMin = run.durationMin || Math.floor((run.duration ?? 0) / 60);
-              const pace = run.pace || (distanceKm > 0 && durationMin > 0 ? (durationMin / distanceKm).toFixed(2) : '0.00');
+              const distanceMeters = run.distance ?? (run.distanceKm ? run.distanceKm * 1000 : 0);
+              const durationSeconds = run.duration ?? (run.durationMin ?? 0) * 60;
+              const pace = calculatePacePerMile(durationSeconds, distanceMeters);
+              const distanceMiles = distanceMeters * 0.000621371;
               return (
                 <View key={run.id} style={styles.runCard}>
                   <Text style={styles.runTitle}>
@@ -279,13 +340,14 @@ export default function HomeScreen({ navigation }) {
                       new Date(run.timestamp ?? Date.now()).toLocaleDateString()}
                   </Text>
                   <Text style={styles.runMeta}>
-                    {distanceKm.toFixed(2)} km • {durationMin} min • {pace} min/km
+                    {distanceMiles.toFixed(2)} mi • {formatDurationCompact(durationSeconds)} • {pace.toFixed(2)} min/mi
                   </Text>
                 </View>
               );
             })
           )}
         </View>
+
         </ScrollView>
       </SafeAreaView>
     </OutsiderBackground>
@@ -298,60 +360,79 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   container: {
-    padding: theme.spacing.lg,
-    paddingBottom: theme.spacing.xxl,
+    padding: 20,
+    paddingBottom: 100, // Extra padding for tab bar
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: theme.spacing.lg,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    flex: 1,
-  },
-  headerRight: {
-    flex: 1,
-    alignItems: 'flex-end',
+    marginBottom: 32,
+    paddingTop: 8,
   },
   headerTitle: {
+    fontSize: 40,
+    fontWeight: '900',
+    color: theme.colors.text,
+    letterSpacing: -1,
+  },
+  topActionButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 28,
+  },
+  topPrimaryAction: {
     flex: 1,
-    textAlign: 'center',
-    fontSize: 20,
-    fontWeight: '700',
-    color: theme.colors.text,
-    letterSpacing: 0.6,
+    borderRadius: 18,
+    overflow: 'hidden',
+    shadowColor: theme.colors.neonPink,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  iconButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+  topSecondaryAction: {
+    flex: 1,
+    backgroundColor: 'rgba(29, 26, 38, 0.9)',
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: 'rgba(85, 215, 255, 0.4)',
+    shadowColor: theme.colors.neonBlue,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  topActionInner: {
+    paddingVertical: 16,
+    paddingHorizontal: 20,
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    marginRight: theme.spacing.sm,
   },
-  iconText: {
+  topActionText: {
     color: theme.colors.text,
+    fontWeight: '800',
+    fontSize: 16,
+    letterSpacing: 0.3,
+  },
+  topSecondaryActionText: {
+    color: theme.colors.neonBlue,
     fontWeight: '700',
-    fontSize: 12,
-    letterSpacing: 0.4,
+    fontSize: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    textAlign: 'center',
   },
   section: {
-    marginBottom: theme.spacing.xl,
+    marginBottom: 32,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: theme.spacing.md,
+    marginBottom: 16,
   },
   sectionTitle: {
     color: theme.colors.text,
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: -0.3,
   },
   sectionLink: {
     color: theme.colors.neonBlue,
@@ -361,119 +442,305 @@ const styles = StyleSheet.create({
     color: SOFT_TEXT,
     marginBottom: theme.spacing.md,
   },
-  goalCard: {
-    backgroundColor: CARD_BG,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: CARD_BORDER,
+  goalCardWrapper: {
+    marginBottom: 20,
   },
-  goalIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: theme.colors.neonPurple,
-    marginRight: theme.spacing.md,
+  goalCard: {
+    borderRadius: 24,
+    padding: 28,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    shadowColor: theme.colors.neonPink,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
   },
   goalContent: {
     flex: 1,
   },
+  goalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  goalValueContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
   goalTitle: {
     color: theme.colors.text,
+    fontSize: 48,
+    fontWeight: '900',
+    letterSpacing: -1.5,
+    marginRight: 8,
+  },
+  goalUnit: {
+    color: MUTED_TEXT,
     fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  goalSubtitle: {
+    color: MUTED_TEXT,
+    fontSize: 15,
+    fontWeight: '500',
+    marginBottom: 20,
+  },
+  currentGoalIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(82, 255, 156, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(82, 255, 156, 0.4)',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  checkmarkCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: theme.colors.neonGreen,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+  },
+  checkmark: {
+    color: theme.colors.text,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  currentGoalText: {
+    color: theme.colors.neonGreen,
+    fontSize: 13,
     fontWeight: '700',
   },
-  goalMeta: {
+  progressSection: {
+    marginTop: 8,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  progressLabel: {
     color: MUTED_TEXT,
-    marginTop: 4,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  progressPercentContainer: {
+    backgroundColor: 'rgba(82, 255, 156, 0.15)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  progressPercent: {
+    color: theme.colors.neonGreen,
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  goalProgressContainer: {
+    marginBottom: 16,
   },
   goalProgress: {
-    height: 6,
+    height: 12,
     borderRadius: 999,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    marginTop: theme.spacing.sm,
-    overflow: 'hidden',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    overflow: 'visible',
+    position: 'relative',
   },
   goalProgressFill: {
     height: '100%',
+    borderRadius: 999,
+  },
+  progressDot: {
+    position: 'absolute',
+    top: -4,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     backgroundColor: theme.colors.neonGreen,
+    borderWidth: 3,
+    borderColor: theme.colors.text,
+    marginLeft: -10,
+    shadowColor: theme.colors.neonGreen,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
+  },
+  progressStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingTop: 12,
+  },
+  progressStatItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  progressStatValue: {
+    color: theme.colors.text,
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+    marginBottom: 4,
+  },
+  progressStatLabel: {
+    color: MUTED_TEXT,
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  progressStatDivider: {
+    width: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    marginHorizontal: 16,
   },
   goalButton: {
-    backgroundColor: theme.colors.neonPink,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-    borderRadius: theme.radius.pill,
-    marginLeft: theme.spacing.md,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginTop: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  goalButtonActive: {
+    shadowColor: theme.colors.neonPink,
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  goalButtonGradient: {
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    alignItems: 'center',
   },
   goalButtonText: {
     color: theme.colors.text,
-    fontWeight: '700',
+    fontWeight: '800',
     letterSpacing: 0.3,
+    fontSize: 15,
   },
   goalButtonDisabled: {
-    opacity: 0.6,
+    opacity: 0.7,
   },
   goalPicker: {
-    marginTop: theme.spacing.md,
+    marginTop: 0,
+  },
+  goalPickerContainer: {
+    backgroundColor: 'rgba(29, 26, 38, 0.5)',
+    borderRadius: 20,
+    paddingVertical: 20,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    marginTop: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
   goalPickerLabel: {
-    color: SOFT_TEXT,
-    fontWeight: '600',
-    marginBottom: theme.spacing.sm,
+    color: theme.colors.text,
+    fontWeight: '800',
+    fontSize: 16,
+    marginBottom: 12,
+    letterSpacing: -0.2,
   },
   goalScale: {
     position: 'relative',
     flexDirection: 'row',
     alignItems: 'flex-end',
-    paddingHorizontal: theme.spacing.xs,
-    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    minHeight: 70,
   },
   goalScaleLine: {
     position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: theme.spacing.sm,
-    height: 1,
-    backgroundColor: CARD_BORDER,
+    left: 20,
+    right: 20,
+    bottom: 24,
+    height: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 2,
   },
   goalTick: {
     alignItems: 'center',
-    paddingHorizontal: theme.spacing.sm,
+    paddingHorizontal: 6,
+    minWidth: 44,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  goalTickActive: {
+    backgroundColor: 'rgba(255, 45, 122, 0.1)',
   },
   goalTickText: {
     color: MUTED_TEXT,
-    fontSize: 12,
-    marginBottom: 6,
+    fontSize: 13,
+    marginBottom: 10,
     fontWeight: '600',
   },
   goalTickTextActive: {
     color: theme.colors.text,
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  goalTickTextMilestone: {
+    fontSize: 14,
+    fontWeight: '700',
   },
   goalTickLine: {
-    width: 2,
-    height: 10,
+    width: 3,
+    height: 14,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 2,
   },
   goalTickLineActive: {
-    height: 14,
+    height: 24,
+    width: 5,
     backgroundColor: theme.colors.neonPink,
+    borderRadius: 3,
+    shadowColor: theme.colors.neonPink,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 6,
+  },
+  goalTickLineMilestone: {
+    height: 18,
+    width: 3,
   },
   readyTitle: {
     color: theme.colors.text,
-    fontSize: 24,
-    fontWeight: '700',
-    marginBottom: theme.spacing.sm,
+    fontSize: 28,
+    fontWeight: '900',
+    marginBottom: 8,
+    letterSpacing: -0.5,
   },
   readyMeta: {
     color: MUTED_TEXT,
-    marginBottom: theme.spacing.md,
+    marginBottom: 24,
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  actionButtonsContainer: {
+    gap: 12,
   },
   primaryAction: {
-    borderRadius: theme.radius.lg,
-    marginBottom: theme.spacing.sm,
+    borderRadius: 18,
     overflow: 'hidden',
+    shadowColor: theme.colors.neonPink,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
   },
   primaryActionInner: {
     paddingVertical: theme.spacing.md,
@@ -481,17 +748,22 @@ const styles = StyleSheet.create({
   },
   primaryActionText: {
     color: theme.colors.text,
-    fontWeight: '700',
-    fontSize: 16,
+    fontWeight: '800',
+    fontSize: 17,
     letterSpacing: 0.5,
   },
   secondaryAction: {
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderRadius: theme.radius.lg,
+    backgroundColor: 'rgba(29, 26, 38, 0.6)',
+    borderRadius: 18,
     paddingVertical: theme.spacing.md,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
+    borderColor: 'rgba(85, 215, 255, 0.3)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   secondaryActionText: {
     color: theme.colors.neonBlue,
@@ -527,21 +799,30 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   runCard: {
-    backgroundColor: CARD_BG,
-    borderRadius: theme.radius.md,
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.sm,
+    backgroundColor: 'rgba(29, 26, 38, 0.6)',
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 12,
     borderWidth: 1,
-    borderColor: CARD_BORDER,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   runTitle: {
     color: theme.colors.text,
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 17,
+    fontWeight: '800',
+    marginBottom: 6,
+    letterSpacing: -0.2,
   },
   runMeta: {
     color: MUTED_TEXT,
-    marginTop: 4,
+    marginTop: 2,
+    fontSize: 14,
+    fontWeight: '500',
   },
   emptyCard: {
     backgroundColor: CARD_BG,
