@@ -10,6 +10,8 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { theme } from '../theme';
 import { fetchFriends } from '../services/friendService';
+import { getUser } from '../services/firebaseService';
+import { auth } from '../firebase';
 import OutsiderBackground from '../components/OutsiderBackground';
 
 const CARD_BG = theme.colors.surfaceElevated;
@@ -27,24 +29,60 @@ export default function LeaderboardScreen({ navigation }) {
       const loadLeaderboard = async () => {
         setIsLoading(true);
         try {
-          const friends = await fetchFriends();
-          const leaderboardData = friends
-            .map((friend) => ({
-              id: friend.id,
-              userId: friend.id,
-              name: friend.displayName ?? friend.name ?? 'Runner',
-              distance: (friend.totalDistance ?? 0) / 1000,
-              runs: friend.totalRuns ?? 0,
-            }))
+          const currentUserId = auth?.currentUser?.uid;
+          const [friends, currentUser] = await Promise.all([
+            fetchFriends(),
+            currentUserId ? getUser(currentUserId).catch(() => null) : null,
+          ]);
+
+          // Build leaderboard entries from friends
+          const friendEntries = friends.map((friend) => ({
+            id: friend.id,
+            userId: friend.id,
+            name: friend.displayName ?? friend.name ?? 'Runner',
+            distance: (friend.totalDistance ?? 0) / 1000,
+            runs: friend.totalRuns ?? 0,
+            isCurrentUser: false,
+          }));
+
+          // Add current user to leaderboard if they exist
+          const allEntries = [...friendEntries];
+          if (currentUser && currentUserId) {
+            const currentUserEntry = {
+              id: currentUserId,
+              userId: currentUserId,
+              name: currentUser.name ?? currentUser.displayName ?? 'You',
+              distance: (currentUser.totalDistance ?? 0) / 1000,
+              runs: currentUser.totalRuns ?? 0,
+              isCurrentUser: true,
+            };
+            // Only add if not already in friends list
+            const isAlreadyInList = friendEntries.some((f) => f.id === currentUserId);
+            if (!isAlreadyInList) {
+              allEntries.push(currentUserEntry);
+            } else {
+              // Mark the existing entry as current user
+              const existingIndex = allEntries.findIndex((e) => e.id === currentUserId);
+              if (existingIndex >= 0) {
+                allEntries[existingIndex].isCurrentUser = true;
+                allEntries[existingIndex].name = currentUser.name ?? currentUser.displayName ?? 'You';
+              }
+            }
+          }
+
+          // Sort by distance and assign ranks
+          const leaderboardData = allEntries
             .sort((a, b) => b.distance - a.distance)
             .map((entry, index) => ({
               ...entry,
               rank: index + 1,
             }));
+
           if (active) {
             setLeaderboard(leaderboardData);
           }
         } catch (error) {
+          console.error('Error loading leaderboard:', error);
           if (active) {
             setLeaderboard([]);
           }
@@ -142,13 +180,18 @@ export default function LeaderboardScreen({ navigation }) {
           leaderboard.map((entry) => (
             <TouchableOpacity
               key={entry.id}
-              style={styles.leaderboardCard}
+              style={[
+                styles.leaderboardCard,
+                entry.isCurrentUser && styles.currentUserCard,
+              ]}
               activeOpacity={0.7}
               onPress={() =>
-                navigation.navigate('UserRunHistory', {
-                  userId: entry.userId ?? entry.id,
-                  userName: entry.name ?? 'Runner',
-                })
+                entry.isCurrentUser
+                  ? navigation.getParent()?.navigate('ProfileTab')
+                  : navigation.navigate('UserRunHistory', {
+                      userId: entry.userId ?? entry.id,
+                      userName: entry.name ?? 'Runner',
+                    })
               }
             >
               <View style={styles.rankContainer}>
@@ -161,7 +204,9 @@ export default function LeaderboardScreen({ navigation }) {
                   </Text>
                 </View>
                 <View style={styles.userDetails}>
-                  <Text style={styles.userName}>{entry.name}</Text>
+                  <Text style={[styles.userName, entry.isCurrentUser && styles.currentUserName]}>
+                    {entry.isCurrentUser ? 'You' : entry.name}
+                  </Text>
                   <Text style={styles.userStats}>
                     {entry.runs} runs • {entry.distance.toFixed(1)} km
                   </Text>
@@ -242,6 +287,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: CARD_BORDER,
   },
+  currentUserCard: {
+    borderWidth: 2,
+    borderColor: theme.colors.neonPink,
+    backgroundColor: 'rgba(255, 45, 122, 0.1)',
+  },
   rankContainer: {
     width: 40,
     alignItems: 'center',
@@ -278,6 +328,10 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     fontSize: 16,
     fontWeight: '600',
+  },
+  currentUserName: {
+    color: theme.colors.neonPink,
+    fontWeight: '700',
   },
   userStats: {
     color: theme.colors.textMuted,

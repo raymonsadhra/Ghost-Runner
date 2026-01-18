@@ -16,6 +16,7 @@ import {
   sendFriendRequest,
   acceptFriendRequest,
   declineFriendRequest,
+  cancelFriendRequest,
 } from '../services/friendService';
 import OutsiderBackground from '../components/OutsiderBackground';
 
@@ -160,6 +161,19 @@ export default function FriendsScreen({ navigation }) {
     }
   };
 
+  const handleCancelRequest = async (requestId) => {
+    try {
+      await cancelFriendRequest(requestId);
+      setStatusTone('info');
+      setStatusMessage('Request canceled.');
+      const pendingData = await fetchPendingRequests();
+      setPendingRequests(pendingData);
+    } catch (error) {
+      setStatusTone('error');
+      setStatusMessage(error?.message || 'Could not cancel request.');
+    }
+  };
+
   return (
     <OutsiderBackground accent="blue">
       <SafeAreaView style={styles.safe}>
@@ -221,7 +235,16 @@ export default function FriendsScreen({ navigation }) {
                     </Text>
                   </View>
                 </View>
-                {request.direction !== 'outgoing' && (
+                {request.direction === 'outgoing' ? (
+                  <View style={styles.requestActions}>
+                    <TouchableOpacity
+                      style={[styles.requestButton, styles.cancelButton]}
+                      onPress={() => handleCancelRequest(request.id)}
+                    >
+                      <Text style={styles.requestButtonText}>Cancel</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
                   <View style={styles.requestActions}>
                     <TouchableOpacity
                       style={[styles.requestButton, styles.acceptButton]}
@@ -396,6 +419,9 @@ const styles = StyleSheet.create({
     backgroundColor: CARD_BG,
     borderWidth: 1,
     borderColor: CARD_BORDER,
+  },
+  cancelButton: {
+    backgroundColor: theme.colors.danger,
   },
   requestButtonText: {
     color: theme.colors.text,
