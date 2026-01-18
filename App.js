@@ -1,20 +1,13 @@
-import React from 'react';
-import { StatusBar, Text, Platform, StyleSheet, View, TouchableOpacity, Dimensions } from 'react-native';
-import { NavigationContainer, getFocusedRouteNameFromRoute } from '@react-navigation/native';
+import React, { useEffect, useState } from 'react';
+import { StatusBar, Text, View, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { BlurView } from 'expo-blur';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const PILL_HORIZONTAL_MARGIN = 16;
-const PILL_WIDTH = SCREEN_WIDTH - PILL_HORIZONTAL_MARGIN * 2;
-const TAB_CONFIG = [
-  { name: 'HomeTab', label: 'Home', icon: '🏠' },
-  { name: 'LeaderboardTab', label: 'Leaderboards', icon: '🏆' },
-  { name: 'FriendsTab', label: 'Friends', icon: '👥' },
-  { name: 'ProfileTab', label: 'Profile', icon: '👤' },
-];
+import { auth, db } from './src/firebase';
+import { onAuthStateChanged, signInWithEmailAndPassword, signInAnonymously, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
+import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 
 import HomeScreen from './src/screens/HomeScreen';
 import RunScreen from './src/screens/RunScreen';
@@ -26,156 +19,393 @@ import ProfileScreen from './src/screens/ProfileScreen';
 import LeaderboardScreen from './src/screens/LeaderboardScreen';
 import UserRunHistoryScreen from './src/screens/UserRunHistoryScreen';
 import FriendsScreen from './src/screens/FriendsScreen';
+
 import { theme } from './src/theme';
 import { audioSources } from './src/config/audioSources';
+// import GlassTabBar from './src/components/GlassTabBar';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// Apple News–style frosted glass tab bar (floating pill, segmented active highlight)
-function GlassTabBar(props) {
-  const insets = useSafeAreaInsets();
-  const { state, navigation } = props;
-  
-  const route = state?.routes[state.index];
-  const nestedRouteName = getFocusedRouteNameFromRoute(route);
-  const hideTabBarRoutes = ['Run', 'GhostRun'];
-  const shouldHide = nestedRouteName && hideTabBarRoutes.includes(nestedRouteName);
-  
-  if (shouldHide) return null;
-  
-  const bottomInset = Math.max(insets.bottom, 10);
-  
-  const PillContent = (
-    <View style={styles.pillInner}>
-      {TAB_CONFIG.map((tab, index) => {
-        const isActive = state.routes[state.index]?.name === tab.name;
-        return (
-          <TouchableOpacity
-            key={tab.name}
-            activeOpacity={0.7}
-            onPress={() => navigation.navigate(tab.name)}
-            style={styles.tabSegment}
-          >
-            {isActive && <View style={styles.activeSegment} />}
-            <View style={styles.tabContent}>
-              <Text style={[styles.tabIcon, isActive && styles.tabIconActive]}>{tab.icon}</Text>
-              <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]} numberOfLines={1}>
-                {tab.label}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
-  
-  if (Platform.OS === 'ios') {
-    return (
-      <View style={[styles.container, { paddingBottom: bottomInset }]}>
-        <View style={styles.pillWrapper}>
-          <BlurView intensity={95} tint="dark" style={styles.pillBlur}>
-            <View style={styles.pillOverlay} />
-            {PillContent}
-          </BlurView>
-        </View>
-      </View>
-    );
-  }
-  
+// --------- Login Screen ---------
+function LoginScreen() {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false);
+
+  const createUserDocument = async (userId, userEmail, userName) => {
+    try {
+      const userRef = doc(db, 'Users', userId);
+      const userSnap = await getDoc(userRef);
+      
+      if (!userSnap.exists()) {
+        // Create user document in Firestore
+        const userData = {
+          userId,
+          name: userName || 'Runner',
+          displayName: userName || 'Runner',
+          createdAt: serverTimestamp(),
+          totalRuns: 0,
+          totalDistance: 0,
+          lastRunAt: null,
+        };
+        
+        // Only add email if provided (not for anonymous users)
+        if (userEmail) {
+          userData.email = userEmail;
+        }
+        
+        await setDoc(userRef, userData);
+        console.log(`Created user document in Firestore: ${userId}`);
+      } else {
+        // Update existing user document with name/email if they're missing
+        const userData = userSnap.data();
+        const updates = {};
+        
+        if (!userData.name || !userData.displayName) {
+          updates.name = userName || userData.name || 'Runner';
+          updates.displayName = userName || userData.displayName || 'Runner';
+        }
+        
+        if (userEmail && !userData.email) {
+          updates.email = userEmail;
+        }
+        
+        if (Object.keys(updates).length > 0) {
+          await setDoc(userRef, { ...userData, ...updates }, { merge: true });
+        }
+      }
+    } catch (error) {
+      console.error('Error creating/updating user document:', error);
+      // Don't throw - auth succeeded, Firestore doc creation is secondary
+    }
+  };
+
+  const handleEmailAuth = async () => {
+    if (!email.trim() || !password.trim()) {
+      setError('Please enter both email and password');
+      return;
+    }
+
+    if (isSignUp && !name.trim()) {
+      setError('Please enter your name');
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+    try {
+      if (isSignUp) {
+        // Sign up
+        const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
+        // Create user document in Firestore
+        await createUserDocument(userCredential.user.uid, email.trim(), name.trim());
+      } else {
+        // Sign in
+        const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
+        // Ensure user document exists (in case it was created before we added this feature)
+        const userRef = doc(db, 'Users', userCredential.user.uid);
+        const userSnap = await getDoc(userRef);
+        if (!userSnap.exists()) {
+          await createUserDocument(userCredential.user.uid, email.trim(), 'Runner');
+        }
+      }
+    } catch (err) {
+      console.error(`${isSignUp ? 'Sign up' : 'Sign in'} error:`, err);
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found') {
+        setError('User not found. Switch to "Sign Up" to create an account.');
+      } else if (err.code === 'auth/email-already-in-use') {
+        setError('Account already exists. Switch to "Sign In" instead.');
+      } else if (err.code === 'auth/weak-password') {
+        setError('Password is too weak. Use at least 6 characters.');
+      } else if (err.code === 'auth/invalid-email') {
+        setError('Invalid email address.');
+      } else if (err.code === 'auth/wrong-password') {
+        setError('Incorrect password. Please try again.');
+      } else {
+        setError(err.message || `Failed to ${isSignUp ? 'create account' : 'sign in'}`);
+      }
+      setLoading(false);
+    }
+  };
+
+  const handleAnonymousLogin = async () => {
+    setError(null);
+    setLoading(true);
+    try {
+      const userCredential = await signInAnonymously(auth);
+      // Create user document for anonymous user
+      await createUserDocument(userCredential.user.uid, null, 'Guest');
+    } catch (err) {
+      console.error('Anonymous login error:', err);
+      if (err.code === 'auth/admin-restricted-operation') {
+        setError('Anonymous auth is disabled. Enable it in Firebase Console → Authentication → Sign-in method → Anonymous');
+      } else {
+        setError(err.message || 'Failed to sign in anonymously. Enable Anonymous Auth in Firebase Console.');
+      }
+      setLoading(false);
+    }
+  };
+
   return (
-    <View style={[styles.container, { paddingBottom: bottomInset }]}>
-      <View style={[styles.pillWrapper, styles.pillAndroid]}>
-        {PillContent}
-      </View>
-    </View>
+    <KeyboardAvoidingView 
+      style={loginStyles.container} 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+    >
+      <ScrollView 
+        contentContainerStyle={loginStyles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={loginStyles.title}>
+          {isSignUp ? 'Create Account' : 'Welcome Back'}
+        </Text>
+        <Text style={loginStyles.subtitle}>
+          {isSignUp ? 'Sign up to start racing ghosts' : 'Sign in to continue'}
+        </Text>
+
+        {error && (
+          <View style={loginStyles.errorContainer}>
+            <Text style={loginStyles.errorText}>{error}</Text>
+          </View>
+        )}
+
+        <View style={loginStyles.form}>
+          {isSignUp && (
+            <View style={loginStyles.inputContainer}>
+              <Text style={loginStyles.label}>Name</Text>
+              <TextInput
+                style={loginStyles.input}
+                placeholder="Your name"
+                placeholderTextColor={theme.colors.textSoft}
+                value={name}
+                onChangeText={setName}
+                autoCapitalize="words"
+                autoCorrect={false}
+                textContentType="name"
+                editable={!loading}
+              />
+            </View>
+          )}
+
+          <View style={loginStyles.inputContainer}>
+            <Text style={loginStyles.label}>Email</Text>
+            <TextInput
+              style={loginStyles.input}
+              placeholder="your@email.com"
+              placeholderTextColor={theme.colors.textSoft}
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="email-address"
+              textContentType="emailAddress"
+              editable={!loading}
+            />
+          </View>
+
+          <View style={loginStyles.inputContainer}>
+            <Text style={loginStyles.label}>Password</Text>
+            <TextInput
+              style={loginStyles.input}
+              placeholder="••••••••"
+              placeholderTextColor={theme.colors.textSoft}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              textContentType={isSignUp ? "newPassword" : "password"}
+              editable={!loading}
+            />
+          </View>
+
+          <TouchableOpacity
+            style={[loginStyles.primaryButton, loading && loginStyles.buttonDisabled]}
+            onPress={handleEmailAuth}
+            disabled={loading}
+          >
+            <Text style={loginStyles.primaryButtonText}>
+              {loading ? (isSignUp ? 'Creating Account...' : 'Signing In...') : (isSignUp ? 'Create Account' : 'Sign In')}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={loginStyles.switchButton}
+            onPress={() => {
+              setIsSignUp(!isSignUp);
+              setError(null);
+              if (!isSignUp) {
+                // Clear name when switching to sign in
+                setName('');
+              }
+            }}
+            disabled={loading}
+          >
+            <Text style={loginStyles.switchText}>
+              {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={loginStyles.divider}>
+          <View style={loginStyles.dividerLine} />
+          <Text style={loginStyles.dividerText}>OR</Text>
+          <View style={loginStyles.dividerLine} />
+        </View>
+
+        <TouchableOpacity
+          style={[loginStyles.guestButton, loading && loginStyles.buttonDisabled]}
+          onPress={handleAnonymousLogin}
+          disabled={loading}
+        >
+          <Text style={loginStyles.guestButtonText}>Continue as Guest</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
+const loginStyles = StyleSheet.create({
   container: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    paddingHorizontal: PILL_HORIZONTAL_MARGIN,
+    flex: 1,
+    backgroundColor: theme.colors.ink,
   },
-  pillWrapper: {
-    width: PILL_WIDTH,
-    borderRadius: 28,
-    overflow: 'hidden',
-    borderWidth: 0.5,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    padding: 20,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: theme.colors.mist,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: theme.colors.textMuted,
+    textAlign: 'center',
+    marginBottom: 32,
+  },
+  errorContainer: {
+    backgroundColor: 'rgba(255, 87, 87, 0.15)',
+    borderWidth: 1,
+    borderColor: theme.colors.danger,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 20,
+  },
+  errorText: {
+    color: theme.colors.danger,
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  form: {
+    width: '100%',
+  },
+  inputContainer: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.textMuted,
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.surfaceElevated,
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    color: theme.colors.mist,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.25,
-        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
       },
       android: {
-        elevation: 12,
+        elevation: 2,
       },
     }),
   },
-  pillBlur: {
-    overflow: 'hidden',
-    borderRadius: 28,
+  primaryButton: {
+    backgroundColor: theme.colors.primary,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    marginTop: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: theme.colors.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
   },
-  pillOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(11, 10, 14, 0.45)',
-    borderRadius: 28,
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
   },
-  pillAndroid: {
-    backgroundColor: 'rgba(21, 19, 28, 0.92)',
+  buttonDisabled: {
+    opacity: 0.6,
   },
-  pillInner: {
+  switchButton: {
+    marginTop: 16,
+    padding: 12,
+  },
+  switchText: {
+    color: theme.colors.primary,
+    fontSize: 14,
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  divider: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-around',
-    height: 56,
-    paddingHorizontal: 4,
+    marginVertical: 24,
   },
-  tabSegment: {
+  dividerLine: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 44,
-    borderRadius: 16,
-    marginHorizontal: 2,
-    position: 'relative',
+    height: 1,
+    backgroundColor: theme.colors.surfaceElevated,
   },
-  activeSegment: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255, 45, 122, 0.25)',
-    borderRadius: 16,
-  },
-  tabContent: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tabIcon: {
-    fontSize: 20,
-    marginBottom: 2,
-    opacity: 0.7,
-  },
-  tabIconActive: {
-    opacity: 1,
-  },
-  tabLabel: {
-    fontSize: 10,
+  dividerText: {
+    color: theme.colors.textSoft,
+    fontSize: 12,
+    marginHorizontal: 16,
     fontWeight: '600',
-    color: 'rgba(245, 242, 255, 0.65)',
-    letterSpacing: 0.2,
   },
-  tabLabelActive: {
-    color: theme.colors.primary,
+  guestButton: {
+    borderWidth: 1,
+    borderColor: theme.colors.surfaceElevated,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    backgroundColor: theme.colors.surface,
+  },
+  guestButtonText: {
+    color: theme.colors.textMuted,
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 
-// Home Stack Navigator (for run flow)
+// --------- Stack Navigators ---------
 function HomeStack() {
   return (
     <Stack.Navigator
@@ -186,42 +416,21 @@ function HomeStack() {
         headerBackTitleVisible: false,
       }}
     >
-      <Stack.Screen 
-        name="Home" 
-        component={HomeScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="Run"
-        component={RunScreen}
-        options={{ title: 'New Run' }}
-      />
-      <Stack.Screen
-        name="GhostSelect"
-        component={GhostSelectScreen}
-        options={{ title: 'Choose a Ghost' }}
-      />
+      <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Run" component={RunScreen} options={{ title: 'New Run' }} />
+      <Stack.Screen name="GhostSelect" component={GhostSelectScreen} options={{ title: 'Choose a Ghost' }} />
       <Stack.Screen
         name="GhostRun"
         component={GhostRunScreen}
         initialParams={{ audioSources }}
         options={{ title: 'Race the Ghost' }}
       />
-      <Stack.Screen
-        name="Summary"
-        component={SummaryScreen}
-        options={{ title: 'Run Summary' }}
-      />
-      <Stack.Screen
-        name="RunHistory"
-        component={RunHistoryScreen}
-        options={{ title: 'Run History' }}
-      />
+      <Stack.Screen name="Summary" component={SummaryScreen} options={{ title: 'Run Summary' }} />
+      <Stack.Screen name="RunHistory" component={RunHistoryScreen} options={{ title: 'Run History' }} />
     </Stack.Navigator>
   );
 }
 
-// Profile Stack Navigator
 function ProfileStack() {
   return (
     <Stack.Navigator
@@ -232,16 +441,11 @@ function ProfileStack() {
         headerBackTitleVisible: false,
       }}
     >
-      <Stack.Screen 
-        name="Profile" 
-        component={ProfileScreen}
-        options={{ headerShown: false }}
-      />
+      <Stack.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }
 
-// Leaderboard Stack Navigator
 function LeaderboardStack() {
   return (
     <Stack.Navigator
@@ -252,11 +456,7 @@ function LeaderboardStack() {
         headerBackTitleVisible: false,
       }}
     >
-      <Stack.Screen 
-        name="Leaderboard" 
-        component={LeaderboardScreen}
-        options={{ headerShown: false }}
-      />
+      <Stack.Screen name="Leaderboard" component={LeaderboardScreen} options={{ headerShown: false }} />
       <Stack.Screen
         name="UserRunHistory"
         component={UserRunHistoryScreen}
@@ -269,7 +469,6 @@ function LeaderboardStack() {
   );
 }
 
-// Friends Stack Navigator
 function FriendsStack() {
   return (
     <Stack.Navigator
@@ -280,98 +479,51 @@ function FriendsStack() {
         headerBackTitleVisible: false,
       }}
     >
-      <Stack.Screen 
-        name="Friends" 
-        component={FriendsScreen}
-        options={{ headerShown: false }}
-      />
+      <Stack.Screen name="Friends" component={FriendsScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }
 
+// --------- Main App ---------
 export default function App() {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setLoading(false);
+    });
+    return unsubscribe;
+  }, []);
+
+  if (loading) return null;
+
   return (
-    <NavigationContainer>
-      <StatusBar barStyle="light-content" />
-      <Tab.Navigator
-        tabBar={(props) => <GlassTabBar {...props} />}
-        screenOptions={({ route }) => {
-          const routeName = getFocusedRouteNameFromRoute(route) ?? 'Home';
-          const hideTabBarRoutes = ['Run', 'GhostRun'];
-          const shouldHideTabBar = hideTabBarRoutes.includes(routeName);
-          
-          return {
-            headerShown: false,
-            lazy: false,
-            tabBarStyle: shouldHideTabBar
-              ? { display: 'none' }
-              : {
-                  backgroundColor: 'transparent',
-                  borderTopWidth: 0,
-                  elevation: 0,
-                  shadowOpacity: 0,
-                  paddingTop: 0,
-                  paddingBottom: 0,
-                  height: 60,
-                },
-            tabBarActiveTintColor: theme.colors.primary,
-            tabBarInactiveTintColor: 'rgba(143, 164, 191, 0.65)',
-            tabBarLabelStyle: {
-              fontSize: 10,
-              fontWeight: '600',
-              marginTop: 2,
-              letterSpacing: 0.2,
-            },
-            tabBarIconStyle: {
-              marginTop: 2,
-            },
-            tabBarItemStyle: {
-              paddingVertical: 6,
-            },
-          };
-        }}
-      >
-        <Tab.Screen 
-          name="HomeTab" 
-          component={HomeStack}
-          options={{
-            tabBarLabel: 'Home',
-            tabBarIcon: ({ color }) => (
-              <Text style={{ color, fontSize: 20 }}>🏠</Text>
-            ),
-          }}
-        />
-        <Tab.Screen 
-          name="LeaderboardTab" 
-          component={LeaderboardStack}
-          options={{
-            tabBarLabel: 'Leaderboards',
-            tabBarIcon: ({ color }) => (
-              <Text style={{ color, fontSize: 20 }}>🏆</Text>
-            ),
-          }}
-        />
-        <Tab.Screen 
-          name="FriendsTab" 
-          component={FriendsStack}
-          options={{
-            tabBarLabel: 'Friends',
-            tabBarIcon: ({ color }) => (
-              <Text style={{ color, fontSize: 20 }}>👥</Text>
-            ),
-          }}
-        />
-        <Tab.Screen 
-          name="ProfileTab" 
-          component={ProfileStack}
-          options={{
-            tabBarLabel: 'Profile',
-            tabBarIcon: ({ color }) => (
-              <Text style={{ color, fontSize: 20 }}>👤</Text>
-            ),
-          }}
-        />
-      </Tab.Navigator>
-    </NavigationContainer>
+    <SafeAreaProvider>
+      <NavigationContainer>
+        <StatusBar barStyle="light-content" />
+        {user ? (
+          <Tab.Navigator
+            screenOptions={{
+              headerShown: false,
+              tabBarActiveTintColor: theme.colors.primary,
+              tabBarInactiveTintColor: theme.colors.mist,
+              tabBarStyle: {
+                backgroundColor: theme.colors.ink,
+                borderTopWidth: 0,
+              },
+            }}
+          >
+            <Tab.Screen name="HomeTab" component={HomeStack} options={{ headerShown: false }} />
+            <Tab.Screen name="LeaderboardTab" component={LeaderboardStack} options={{ headerShown: false }} />
+            <Tab.Screen name="FriendsTab" component={FriendsStack} options={{ headerShown: false }} />
+            <Tab.Screen name="ProfileTab" component={ProfileStack} options={{ headerShown: false }} />
+          </Tab.Navigator>
+        ) : (
+          <LoginScreen />
+        )}
+      </NavigationContainer>
+    </SafeAreaProvider>
   );
 }
