@@ -7,16 +7,16 @@ import {
   ScrollView,
   TextInput,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
 import { getUserRuns } from '../services/firebaseService';
-import { seedFakeRuns } from '../services/seedFakeRuns';
 import { loadRewards } from '../services/rewardService';
 import { loadProfile, updateProfile } from '../services/profileService';
 import { AVATAR_BASES, COSMETICS, COSMETIC_CATEGORIES } from '../config/cosmetics';
 import { getProgressToNextLevel } from '../utils/leveling';
+import { getWeekStart } from '../utils/unitUtils';
+import { useSettings } from '../contexts/SettingsContext';
 import { theme } from '../theme';
 
 const PRIMARY_BLUE = '#2F6BFF';
@@ -33,15 +33,8 @@ function formatBadgeLabel(badgeId) {
     .join(' ');
 }
 
-function getWeekStart(timestamp) {
-  const date = new Date(timestamp);
-  const day = (date.getDay() + 6) % 7;
-  date.setDate(date.getDate() - day);
-  date.setHours(0, 0, 0, 0);
-  return date.getTime();
-}
-
-export default function ProfileScreen() {
+export default function ProfileScreen({ navigation }) {
+  const { settings, formatDistance, formatDistanceParts } = useSettings();
   const [xp, setXp] = useState(0);
   const [badges, setBadges] = useState([]);
   const [unlocks, setUnlocks] = useState([]);
@@ -49,7 +42,6 @@ export default function ProfileScreen() {
   const [profile, setProfile] = useState(null);
   const [profileName, setProfileName] = useState('');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
-  const [isSeeding, setIsSeeding] = useState(false);
   const [runs, setRuns] = useState([]);
 
   useFocusEffect(
@@ -84,16 +76,16 @@ export default function ProfileScreen() {
   const selectedBase = profile?.base ?? AVATAR_BASES[0]?.id;
 
   const weekSummary = useMemo(() => {
-    const weekStart = getWeekStart(Date.now());
+    const weekStart = getWeekStart(Date.now(), settings.weekStartsOn);
     const weekRuns = runs.filter((run) => (run.timestamp ?? 0) >= weekStart);
     const distance = weekRuns.reduce((sum, run) => sum + (run.distance ?? 0), 0);
     const duration = weekRuns.reduce((sum, run) => sum + (run.duration ?? 0), 0);
     return {
-      distanceKm: distance / 1000,
+      distanceMeters: distance,
       durationMin: Math.floor(duration / 60),
       count: weekRuns.length,
     };
-  }, [runs]);
+  }, [runs, settings.weekStartsOn]);
 
   const isUnlocked = useCallback((item) => xp >= (item?.xpRequired ?? 0), [xp]);
 
@@ -134,40 +126,6 @@ export default function ProfileScreen() {
     [currentOutfit, updateProfilePatch]
   );
 
-  const handleSeedFakeRuns = useCallback(async () => {
-    Alert.alert(
-      'Seed fake runs',
-      'Add 10 fake runs each for anon + Runner 1–5 (60 total)? This uses your Firebase.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Seed',
-          onPress: async () => {
-            setIsSeeding(true);
-            try {
-              const { saved, failed, errors } = await seedFakeRuns({
-                withLeaderboardUsers: true,
-                runsPerUser: 10,
-              });
-              const msg = failed > 0
-                ? `Saved: ${saved}. Failed: ${failed}. ${errors[0] || ''}`
-                : `Done. ${saved} runs saved to Firebase.`;
-              Alert.alert('Seed complete', msg);
-              if (saved > 0) {
-                const data = await getUserRuns(undefined, { max: 5 });
-                setRuns(data ?? []);
-              }
-            } catch (e) {
-              Alert.alert('Seed failed', e?.message || String(e));
-            } finally {
-              setIsSeeding(false);
-            }
-          },
-        },
-      ]
-    );
-  }, []);
-
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.container}>
@@ -181,6 +139,12 @@ export default function ProfileScreen() {
             <Text style={styles.profileName}>{profileName || 'Runner'}</Text>
             <Text style={styles.profileLocation}>Ghost Runner League</Text>
           </View>
+          <TouchableOpacity
+            style={styles.settingsButton}
+            onPress={() => navigation.navigate('Settings')}
+          >
+            <Text style={styles.settingsButtonText}>Settings</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.statsRow}>
@@ -218,9 +182,9 @@ export default function ProfileScreen() {
           <View style={styles.weekRow}>
             <View style={styles.weekStat}>
               <Text style={styles.weekValue}>
-                {weekSummary.distanceKm.toFixed(2)}
+                {formatDistanceParts(weekSummary.distanceMeters).value}
               </Text>
-              <Text style={styles.weekLabel}>km</Text>
+              <Text style={styles.weekLabel}>{formatDistanceParts(weekSummary.distanceMeters).unit}</Text>
             </View>
             <View style={styles.weekStat}>
               <Text style={styles.weekValue}>{weekSummary.durationMin}</Text>
@@ -368,25 +332,12 @@ export default function ProfileScreen() {
                     new Date(run.timestamp ?? Date.now()).toLocaleDateString()}
                 </Text>
                 <Text style={styles.activityMeta}>
-                  {(run.distanceKm ?? (run.distance ?? 0) / 1000).toFixed(2)} km •{' '}
+                  {formatDistance(run.distance ?? (run.distanceKm ?? 0) * 1000)} •{' '}
                   {Math.floor((run.duration ?? 0) / 60)} min
                 </Text>
               </View>
             ))
           )}
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Developer</Text>
-          <TouchableOpacity
-            style={[styles.seedButton, isSeeding && styles.seedButtonDisabled]}
-            onPress={handleSeedFakeRuns}
-            disabled={isSeeding}
-          >
-            <Text style={styles.seedButtonText}>
-              {isSeeding ? 'Seeding…' : 'Seed fake runs to Firebase'}
-            </Text>
-          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -423,6 +374,15 @@ const styles = StyleSheet.create({
   },
   profileInfo: {
     flex: 1,
+  },
+  settingsButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  settingsButtonText: {
+    color: PRIMARY_BLUE,
+    fontWeight: '600',
+    fontSize: 15,
   },
   profileName: {
     color: theme.colors.mist,
@@ -615,21 +575,5 @@ const styles = StyleSheet.create({
   activityMeta: {
     color: MUTED_TEXT,
     marginTop: 4,
-  },
-  seedButton: {
-    backgroundColor: CARD_BG,
-    borderRadius: theme.radius.md,
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-    borderWidth: 1,
-    borderColor: CARD_BORDER,
-    alignItems: 'center',
-  },
-  seedButtonDisabled: {
-    opacity: 0.6,
-  },
-  seedButtonText: {
-    color: MUTED_TEXT,
-    fontWeight: '600',
   },
 });

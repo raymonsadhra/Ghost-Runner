@@ -7,6 +7,7 @@ import { GhostRacer } from '../services/GhostRacer';
 import { AudioManager } from '../services/AudioManager';
 import { calculateTotalDistance } from '../utils/geoUtils';
 import { generatePowerUps, pickPowerUpInRange } from '../services/powerUpService';
+import { useSettings } from '../contexts/SettingsContext';
 import { theme } from '../theme';
 import { audioSources } from '../config/audioSources';
 
@@ -66,6 +67,7 @@ function getInitialRegion(points) {
 }
 
 export default function GhostRunScreen({ navigation, route }) {
+  const { formatDistance, formatPace } = useSettings();
   const ghostRoute = route.params?.ghostRoute ?? [];
   const ghostMeta = route.params?.ghostMeta ?? null;
   const isBoss = ghostMeta?.type === 'boss';
@@ -425,15 +427,11 @@ export default function GhostRunScreen({ navigation, route }) {
           </View>
           <View style={styles.hudStatBlock}>
             <Text style={styles.hudLabel}>Distance</Text>
-            <Text style={styles.hudValue}>
-              {(distance / 1000).toFixed(2)} km
-            </Text>
+            <Text style={styles.hudValue}>{formatDistance(distance)}</Text>
           </View>
           <View style={styles.hudStatBlock}>
             <Text style={styles.hudLabel}>Pace</Text>
-            <Text style={styles.hudValue}>
-              {pace > 0 ? pace.toFixed(2) : '0.00'} /km
-            </Text>
+            <Text style={styles.hudValue}>{formatPace(pace)}</Text>
           </View>
         </View>
         <View style={styles.deltaChip}>

@@ -11,6 +11,7 @@ import {
   Alert,
 } from 'react-native';
 import { getUserRuns, updateRunName, deleteRun } from '../services/firebaseService';
+import { useSettings } from '../contexts/SettingsContext';
 import { theme } from '../theme';
 
 const RUNS_LIMIT = 50;
@@ -24,21 +25,22 @@ function getRunTitle(run) {
   return trimmed || formatDate(run.timestamp);
 }
 
-function buildRunMeta(run, includeDate) {
-  const distanceKm = (run.distance ?? 0) / 1000;
+function buildRunMeta(run, includeDate, { formatDistance, formatPace }) {
+  const distanceM = run.distance ?? (run.distanceKm ?? 0) * 1000;
   const durationMin = Math.floor((run.duration ?? 0) / 60);
-  const pace = distanceKm > 0 ? (run.duration / 60) / distanceKm : 0;
+  const paceMinPerKm = run.pace ?? (distanceM > 0 ? ((run.duration ?? 0) / 60) / (distanceM / 1000) : 0);
   const parts = [];
   if (includeDate) {
     parts.push(formatDate(run.timestamp));
   }
-  parts.push(`${distanceKm.toFixed(2)} km`);
+  parts.push(formatDistance(distanceM));
   parts.push(`${durationMin} min`);
-  parts.push(`Pace ${pace.toFixed(2)} min/km`);
+  parts.push(`Pace ${formatPace(paceMinPerKm)}`);
   return parts.join(' • ');
 }
 
 export default function RunHistoryScreen() {
+  const { formatDistance, formatPace } = useSettings();
   const [runs, setRuns] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -145,7 +147,7 @@ export default function RunHistoryScreen() {
   const renderRun = ({ item }) => {
     const title = getRunTitle(item);
     const includeDate = Boolean(item.name?.trim());
-    const meta = buildRunMeta(item, includeDate);
+    const meta = buildRunMeta(item, includeDate, { formatDistance, formatPace });
 
     return (
       <View style={styles.card}>

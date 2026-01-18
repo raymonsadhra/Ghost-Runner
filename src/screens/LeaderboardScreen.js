@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSettings } from '../contexts/SettingsContext';
 import { theme } from '../theme';
 
 const PRIMARY_BLUE = '#2F6BFF';
@@ -17,6 +18,7 @@ const CARD_BORDER = '#1E2A3C';
 const MUTED_TEXT = '#8FA4BF';
 
 export default function LeaderboardScreen({ navigation }) {
+  const { formatDistance, formatDistanceParts } = useSettings();
   const [leaderboard, setLeaderboard] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedFilter, setSelectedFilter] = useState('weekly'); // weekly, monthly, allTime
@@ -157,16 +159,16 @@ export default function LeaderboardScreen({ navigation }) {
                 <View style={styles.userDetails}>
                   <Text style={styles.userName}>{entry.name}</Text>
                   <Text style={styles.userStats}>
-                    {entry.runs} runs • {entry.distance.toFixed(1)} km
+                    {entry.runs} runs • {formatDistance((entry.distance ?? 0) * 1000)}
                   </Text>
                 </View>
               </View>
               <View style={styles.distanceContainer}>
                 <View>
                   <Text style={styles.distanceValue}>
-                    {entry.distance.toFixed(1)}
+                    {formatDistanceParts((entry.distance ?? 0) * 1000).value}
                   </Text>
-                  <Text style={styles.distanceLabel}>km</Text>
+                  <Text style={styles.distanceLabel}>{formatDistanceParts((entry.distance ?? 0) * 1000).unit}</Text>
                 </View>
                 <Text style={styles.chevron}>›</Text>
               </View>

@@ -14,9 +14,11 @@ import {
   deleteBossGhost,
   getBossGhosts,
 } from '../services/bossGhostService';
+import { useSettings } from '../contexts/SettingsContext';
 import { theme } from '../theme';
 
 export default function GhostSelectScreen({ navigation }) {
+  const { formatDistance, formatPace } = useSettings();
   const [runs, setRuns] = useState([]);
   const [bossGhosts, setBossGhosts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -92,10 +94,9 @@ export default function GhostSelectScreen({ navigation }) {
   };
 
   const renderRun = ({ item }) => {
-    // Use Firebase fields if available, otherwise calculate
-    const distanceKm = item.distanceKm || (item.distance ?? 0) / 1000;
-    const durationMin = item.durationMin || Math.floor((item.duration ?? 0) / 60);
-    const pace = item.pace || (distanceKm > 0 && durationMin > 0 ? (durationMin / distanceKm).toFixed(2) : 0);
+    const distanceM = item.distance ?? (item.distanceKm ?? 0) * 1000;
+    const durationMin = item.durationMin ?? Math.floor((item.duration ?? 0) / 60);
+    const paceMinPerKm = typeof item.pace === 'number' ? item.pace : (distanceM > 0 && durationMin > 0 ? durationMin / (distanceM / 1000) : 0);
     const isBoss = item.type === 'boss';
     const bossPalette = item.character?.palette;
     const bossAccent = bossPalette?.primary ?? theme.colors.primary;
@@ -139,10 +140,10 @@ export default function GhostSelectScreen({ navigation }) {
           </Text>
         </View>
         <Text style={styles.cardMeta}>
-          {distanceKm.toFixed(2)} km • {durationMin} min
+          {formatDistance(distanceM)} • {durationMin} min
         </Text>
         <Text style={styles.cardMeta}>
-          Pace {typeof pace === 'number' ? pace.toFixed(2) : pace} min/km
+          Pace {formatPace(paceMinPerKm)}
         </Text>
         {isBoss && (
           <Text style={[styles.bossMeta, { color: bossAccent }]}>

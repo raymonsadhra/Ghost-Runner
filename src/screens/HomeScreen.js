@@ -10,22 +10,18 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { theme } from '../theme';
 import { getUserRuns } from '../services/firebaseService';
+import { getWeekStart } from '../utils/unitUtils';
+import { useSettings } from '../contexts/SettingsContext';
 
 const PRIMARY_BLUE = '#2F6BFF';
 const DARK_BG = '#0B0F17';
 const CARD_BG = '#121A2A';
 const CARD_BORDER = '#1E2A3C';
 const MUTED_TEXT = '#8FA4BF';
-
-function getWeekStart(timestamp) {
-  const date = new Date(timestamp);
-  const day = (date.getDay() + 6) % 7;
-  date.setDate(date.getDate() - day);
-  date.setHours(0, 0, 0, 0);
-  return date.getTime();
-}
+const GOAL_METERS = 10000;
 
 export default function HomeScreen({ navigation }) {
+  const { settings, formatDistance, formatPace } = useSettings();
   const [runs, setRuns] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -58,24 +54,22 @@ export default function HomeScreen({ navigation }) {
   );
 
   const summary = useMemo(() => {
-    const weekStart = getWeekStart(Date.now());
+    const weekStart = getWeekStart(Date.now(), settings.weekStartsOn);
     const weekRuns = runs.filter((run) => (run.timestamp ?? 0) >= weekStart);
     const distance = weekRuns.reduce((sum, run) => {
-      // Use distanceKm if available, otherwise convert distance from meters
-      const runDistance = run.distanceKm ? run.distanceKm * 1000 : (run.distance ?? 0);
+      const runDistance = run.distance ?? (run.distanceKm ?? 0) * 1000;
       return sum + runDistance;
     }, 0);
     return {
-      distanceKm: distance / 1000,
+      distanceMeters: distance,
       count: weekRuns.length,
       prs: 0,
     };
-  }, [runs]);
+  }, [runs, settings.weekStartsOn]);
 
   const recentRuns = runs.slice(0, 3);
-  const goalKm = 10;
-  const progressKm = Math.min(goalKm, summary.distanceKm);
-  const progressPercent = goalKm > 0 ? progressKm / goalKm : 0;
+  const progressMeters = Math.min(GOAL_METERS, summary.distanceMeters);
+  const progressPercent = GOAL_METERS > 0 ? progressMeters / GOAL_METERS : 0;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -120,9 +114,9 @@ export default function HomeScreen({ navigation }) {
           <View style={styles.goalCard}>
             <View style={styles.goalIcon} />
             <View style={styles.goalContent}>
-              <Text style={styles.goalTitle}>{goalKm} km per week</Text>
+              <Text style={styles.goalTitle}>{formatDistance(GOAL_METERS)} per week</Text>
               <Text style={styles.goalMeta}>
-                {progressKm.toFixed(1)} km / {goalKm} km run
+                {formatDistance(progressMeters)} / {formatDistance(GOAL_METERS)} run
               </Text>
               <View style={styles.goalProgress}>
                 <View
@@ -189,9 +183,9 @@ export default function HomeScreen({ navigation }) {
             </View>
           ) : (
             recentRuns.map((run) => {
-              const distanceKm = run.distanceKm || (run.distance ?? 0) / 1000;
-              const durationMin = run.durationMin || Math.floor((run.duration ?? 0) / 60);
-              const pace = run.pace || (distanceKm > 0 && durationMin > 0 ? (durationMin / distanceKm).toFixed(2) : '0.00');
+              const distanceM = run.distance ?? (run.distanceKm ?? 0) * 1000;
+              const durationMin = run.durationMin ?? Math.floor((run.duration ?? 0) / 60);
+              const paceMinPerKm = run.pace ?? (distanceM > 0 && durationMin > 0 ? durationMin / (distanceM / 1000) : 0);
               return (
                 <View key={run.id} style={styles.runCard}>
                   <Text style={styles.runTitle}>
@@ -199,7 +193,7 @@ export default function HomeScreen({ navigation }) {
                       new Date(run.timestamp ?? Date.now()).toLocaleDateString()}
                   </Text>
                   <Text style={styles.runMeta}>
-                    {distanceKm.toFixed(2)} km • {durationMin} min • {pace} min/km
+                    {formatDistance(distanceM)} • {durationMin} min • {formatPace(paceMinPerKm)}
                   </Text>
                 </View>
               );

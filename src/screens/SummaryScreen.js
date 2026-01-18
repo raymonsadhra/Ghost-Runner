@@ -13,6 +13,7 @@ import MapView, { Polyline } from 'react-native-maps';
 import { theme } from '../theme';
 import { updateRunName } from '../services/firebaseService';
 import { awardBossRewards } from '../services/rewardService';
+import { useSettings } from '../contexts/SettingsContext';
 
 const DEFAULT_REGION = {
   latitude: 37.7749,
@@ -33,10 +34,11 @@ function getInitialRegion(points) {
 }
 
 export default function SummaryScreen({ navigation, route }) {
+  const { formatDistance, formatPace, formatDistanceParts } = useSettings();
   const routePoints = route.params?.routePoints ?? [];
   const distance = route.params?.distance ?? 0;
   const duration = route.params?.duration ?? 0;
-  const pace = distance > 0 ? (duration / 60) / (distance / 1000) : 0;
+  const paceMinPerKm = distance > 0 ? (duration / 60) / (distance / 1000) : 0;
   const runId = route.params?.runId ?? null;
   const runLocalId = route.params?.runLocalId ?? null;
   const runLocalOnly = route.params?.runLocalOnly ?? false;
@@ -120,8 +122,8 @@ export default function SummaryScreen({ navigation, route }) {
           <Text style={styles.title}>Run Complete</Text>
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
-              <Text style={styles.statValue}>{(distance / 1000).toFixed(2)}</Text>
-              <Text style={styles.statLabel}>km</Text>
+              <Text style={styles.statValue}>{formatDistanceParts(distance).value}</Text>
+              <Text style={styles.statLabel}>{formatDistanceParts(distance).unit}</Text>
             </View>
             <View style={styles.statCard}>
               <Text style={styles.statValue}>
@@ -131,8 +133,8 @@ export default function SummaryScreen({ navigation, route }) {
               <Text style={styles.statLabel}>time</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statValue}>{pace.toFixed(2)}</Text>
-              <Text style={styles.statLabel}>min/km</Text>
+              <Text style={styles.statValue}>{formatPace(paceMinPerKm)}</Text>
+              <Text style={styles.statLabel}>pace</Text>
             </View>
           </View>
 

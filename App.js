@@ -28,6 +28,8 @@ import UserRunHistoryScreen from './src/screens/UserRunHistoryScreen';
 import FriendsScreen from './src/screens/FriendsScreen';
 import { theme } from './src/theme';
 import { audioSources } from './src/config/audioSources';
+import { SettingsProvider } from './src/contexts/SettingsContext';
+import SettingsScreen from './src/screens/SettingsScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -237,6 +239,11 @@ function ProfileStack() {
         component={ProfileScreen}
         options={{ headerShown: false }}
       />
+      <Stack.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{ title: 'Settings' }}
+      />
     </Stack.Navigator>
   );
 }
@@ -291,8 +298,9 @@ function FriendsStack() {
 
 export default function App() {
   return (
-    <NavigationContainer>
-      <StatusBar barStyle="light-content" />
+    <SettingsProvider>
+      <NavigationContainer>
+        <StatusBar barStyle="light-content" />
       <Tab.Navigator
         tabBar={(props) => <GlassTabBar {...props} />}
         screenOptions={({ route }) => {
@@ -372,6 +380,7 @@ export default function App() {
           }}
         />
       </Tab.Navigator>
-    </NavigationContainer>
+      </NavigationContainer>
+    </SettingsProvider>
   );
 }

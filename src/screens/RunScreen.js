@@ -7,6 +7,7 @@ import { calculateTotalDistance } from '../utils/geoUtils';
 import { saveRun } from '../services/firebaseService';
 import { createBossGhostIfEligible } from '../services/bossGhostService';
 import { awardRunXp } from '../services/rewardService';
+import { useSettings } from '../contexts/SettingsContext';
 import { theme } from '../theme';
 
 const PRIMARY_BLUE = '#2F6BFF';
@@ -42,6 +43,7 @@ function getInitialRegion(points) {
 }
 
 export default function RunScreen({ navigation }) {
+  const { formatDistance, formatPace } = useSettings();
   const trackerRef = useRef(new LocationTracker());
   const startTimeRef = useRef(0);
 
@@ -50,7 +52,7 @@ export default function RunScreen({ navigation }) {
   const [distance, setDistance] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
-  const pace = distance > 0 ? (duration / 60) / (distance / 1000) : 0;
+  const paceMinPerKm = distance > 0 ? (duration / 60) / (distance / 1000) : 0;
 
   const handlePoint = useCallback((point, allPoints) => {
     setPoints([...allPoints]);
@@ -162,7 +164,7 @@ export default function RunScreen({ navigation }) {
       <View style={styles.stats}>
         <View style={styles.statBlock}>
           <Text style={styles.statLabel}>Distance</Text>
-          <Text style={styles.statValue}>{(distance / 1000).toFixed(2)} km</Text>
+          <Text style={styles.statValue}>{formatDistance(distance)}</Text>
         </View>
         <View style={styles.statBlock}>
           <Text style={styles.statLabel}>Time</Text>
@@ -173,9 +175,7 @@ export default function RunScreen({ navigation }) {
         </View>
         <View style={styles.statBlock}>
           <Text style={styles.statLabel}>Pace</Text>
-          <Text style={styles.statValue}>
-            {pace > 0 ? pace.toFixed(2) : '0.00'} /km
-          </Text>
+          <Text style={styles.statValue}>{formatPace(paceMinPerKm)}</Text>
         </View>
       </View>
 

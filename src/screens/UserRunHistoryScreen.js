@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { getUserRuns } from '../services/firebaseService';
+import { useSettings } from '../contexts/SettingsContext';
 import { theme } from '../theme';
 
 const RUNS_LIMIT = 50;
@@ -30,21 +31,22 @@ function getRunTitle(run) {
   return trimmed || formatDate(run.timestamp);
 }
 
-function buildRunMeta(run, includeDate) {
-  const distanceKm = run.distanceKm ?? (run.distance ?? 0) / 1000;
+function buildRunMeta(run, includeDate, { formatDistance, formatPace }) {
+  const distanceM = run.distance ?? (run.distanceKm ?? 0) * 1000;
   const durationMin = run.durationMin ?? Math.floor((run.duration ?? 0) / 60);
-  const pace = distanceKm > 0 ? (run.duration ?? 0) / 60 / distanceKm : (run.pace ?? 0);
+  const paceMinPerKm = run.pace ?? (distanceM > 0 ? (run.duration ?? 0) / 60 / (distanceM / 1000) : 0);
   const parts = [];
   if (includeDate) {
     parts.push(formatDate(run.timestamp));
   }
-  parts.push(`${distanceKm.toFixed(2)} km`);
+  parts.push(formatDistance(distanceM));
   parts.push(`${durationMin} min`);
-  parts.push(`Pace ${pace.toFixed(2)} min/km`);
+  parts.push(`Pace ${formatPace(paceMinPerKm)}`);
   return parts.join(' • ');
 }
 
 export default function UserRunHistoryScreen({ route, navigation }) {
+  const { formatDistance, formatPace } = useSettings();
   const userId = route.params?.userId ?? null;
   const userName = route.params?.userName ?? 'Runner';
 
@@ -90,7 +92,7 @@ export default function UserRunHistoryScreen({ route, navigation }) {
   const renderRun = ({ item }) => {
     const title = getRunTitle(item);
     const includeDate = Boolean(item.name?.trim());
-    const meta = buildRunMeta(item, includeDate);
+    const meta = buildRunMeta(item, includeDate, { formatDistance, formatPace });
 
     return (
       <View style={styles.card}>
