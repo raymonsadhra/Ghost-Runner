@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   SafeAreaView,
   View,
@@ -11,12 +11,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { theme } from '../theme';
 import { getUserRuns } from '../services/firebaseService';
+import { DEFAULT_WEEKLY_GOAL_KM, loadWeeklyGoal, saveWeeklyGoal } from '../services/goalService';
 import OutsiderBackground from '../components/OutsiderBackground';
 
 const CARD_BG = theme.colors.surfaceElevated;
 const CARD_BORDER = 'rgba(255, 255, 255, 0.08)';
 const MUTED_TEXT = theme.colors.textMuted;
 const SOFT_TEXT = theme.colors.textSoft;
+const POLL_INTERVAL_MS = 10000;
 
 function getWeekStart(timestamp) {
   const date = new Date(timestamp);
@@ -29,12 +31,20 @@ function getWeekStart(timestamp) {
 export default function HomeScreen({ navigation }) {
   const [runs, setRuns] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [goalKm, setGoalKm] = useState(DEFAULT_WEEKLY_GOAL_KM);
+  const [selectedGoalKm, setSelectedGoalKm] = useState(DEFAULT_WEEKLY_GOAL_KM);
+  const [isSavingGoal, setIsSavingGoal] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
-      const loadRuns = async () => {
-        setIsLoading(true);
+      let inFlight = false;
+      const loadRuns = async ({ showLoading = false } = {}) => {
+        if (inFlight) return;
+        inFlight = true;
+        if (showLoading) {
+          setIsLoading(true);
+        }
         try {
           const data = await getUserRuns();
           if (active) {
@@ -45,18 +55,39 @@ export default function HomeScreen({ navigation }) {
             setRuns([]);
           }
         } finally {
-          if (active) {
+          if (active && showLoading) {
             setIsLoading(false);
           }
+          inFlight = false;
         }
       };
 
-      loadRuns();
+      loadRuns({ showLoading: true });
+      const intervalId = setInterval(() => {
+        void loadRuns();
+      }, POLL_INTERVAL_MS);
       return () => {
         active = false;
+        clearInterval(intervalId);
       };
     }, [])
   );
+
+  useEffect(() => {
+    let active = true;
+    const loadGoal = async () => {
+      const storedGoal = await loadWeeklyGoal();
+      if (active) {
+        setGoalKm(storedGoal);
+        setSelectedGoalKm(storedGoal);
+      }
+    };
+
+    loadGoal();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const summary = useMemo(() => {
     const weekStart = getWeekStart(Date.now());
@@ -74,9 +105,26 @@ export default function HomeScreen({ navigation }) {
   }, [runs]);
 
   const recentRuns = runs.slice(0, 3);
-  const goalKm = 10;
+  const goalOptions = useMemo(
+    () => Array.from({ length: 50 }, (_, index) => index + 1),
+    []
+  );
   const progressKm = Math.min(goalKm, summary.distanceKm);
   const progressPercent = goalKm > 0 ? progressKm / goalKm : 0;
+  const isGoalCurrent = selectedGoalKm === goalKm;
+
+  const handleSetGoal = async () => {
+    if (isGoalCurrent || isSavingGoal) {
+      return;
+    }
+    setIsSavingGoal(true);
+    try {
+      const nextGoal = await saveWeeklyGoal(selectedGoalKm);
+      setGoalKm(nextGoal);
+    } finally {
+      setIsSavingGoal(false);
+    }
+  };
 
   return (
     <OutsiderBackground accent="purple">
@@ -135,9 +183,45 @@ export default function HomeScreen({ navigation }) {
                 />
               </View>
             </View>
-            <TouchableOpacity style={styles.goalButton}>
-              <Text style={styles.goalButtonText}>Set Goal</Text>
+            <TouchableOpacity
+              style={[styles.goalButton, isGoalCurrent && styles.goalButtonDisabled]}
+              onPress={handleSetGoal}
+              disabled={isGoalCurrent || isSavingGoal}
+            >
+              <Text style={styles.goalButtonText}>
+                {isGoalCurrent ? 'Goal Set' : isSavingGoal ? 'Saving...' : 'Set Goal'}
+              </Text>
             </TouchableOpacity>
+          </View>
+          <View style={styles.goalPicker}>
+            <Text style={styles.goalPickerLabel}>Pick a weekly target</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.goalScale}
+            >
+              <View style={styles.goalScaleLine} pointerEvents="none" />
+              {goalOptions.map((value) => {
+                const isActive = value === selectedGoalKm;
+                return (
+                  <TouchableOpacity
+                    key={value}
+                    onPress={() => setSelectedGoalKm(value)}
+                    style={styles.goalTick}
+                  >
+                    <Text style={[styles.goalTickText, isActive && styles.goalTickTextActive]}>
+                      {value}
+                    </Text>
+                    <View
+                      style={[
+                        styles.goalTickLine,
+                        isActive && styles.goalTickLineActive,
+                      ]}
+                    />
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
           </View>
         </View>
 
@@ -166,22 +250,6 @@ export default function HomeScreen({ navigation }) {
           >
             <Text style={styles.secondaryActionText}>Race a Ghost</Text>
           </TouchableOpacity>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Suggested Challenges</Text>
-          <Text style={styles.sectionMetaText}>
-            Make accountability more fun and earn rewards.
-          </Text>
-          <View style={styles.challengeCard}>
-            <Text style={styles.challengeTitle}>December 5K Challenge</Text>
-            <Text style={styles.challengeMeta}>
-              Chase your best 5K run and claim a digital trophy.
-            </Text>
-            <View style={styles.challengeBadge}>
-              <Text style={styles.challengeBadgeText}>Digital Trophy</Text>
-            </View>
-          </View>
         </View>
 
         <View style={styles.section}>
@@ -341,6 +409,54 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     fontWeight: '700',
     letterSpacing: 0.3,
+  },
+  goalButtonDisabled: {
+    opacity: 0.6,
+  },
+  goalPicker: {
+    marginTop: theme.spacing.md,
+  },
+  goalPickerLabel: {
+    color: SOFT_TEXT,
+    fontWeight: '600',
+    marginBottom: theme.spacing.sm,
+  },
+  goalScale: {
+    position: 'relative',
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: theme.spacing.xs,
+    paddingVertical: theme.spacing.sm,
+  },
+  goalScaleLine: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: theme.spacing.sm,
+    height: 1,
+    backgroundColor: CARD_BORDER,
+  },
+  goalTick: {
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing.sm,
+  },
+  goalTickText: {
+    color: MUTED_TEXT,
+    fontSize: 12,
+    marginBottom: 6,
+    fontWeight: '600',
+  },
+  goalTickTextActive: {
+    color: theme.colors.text,
+  },
+  goalTickLine: {
+    width: 2,
+    height: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  goalTickLineActive: {
+    height: 14,
+    backgroundColor: theme.colors.neonPink,
   },
   readyTitle: {
     color: theme.colors.text,

@@ -17,6 +17,8 @@ import {
 import { theme } from '../theme';
 import OutsiderBackground from '../components/OutsiderBackground';
 
+const POLL_INTERVAL_MS = 10000;
+
 export default function GhostSelectScreen({ navigation }) {
   const [runs, setRuns] = useState([]);
   const [bossGhosts, setBossGhosts] = useState([]);
@@ -25,8 +27,13 @@ export default function GhostSelectScreen({ navigation }) {
   useFocusEffect(
     useCallback(() => {
       let active = true;
-      const loadRuns = async () => {
-        setIsLoading(true);
+      let inFlight = false;
+      const loadRuns = async ({ showLoading = false } = {}) => {
+        if (inFlight) return;
+        inFlight = true;
+        if (showLoading) {
+          setIsLoading(true);
+        }
         try {
           const [runsData, bossData] = await Promise.all([
             getUserRuns(),
@@ -48,15 +55,20 @@ export default function GhostSelectScreen({ navigation }) {
             setBossGhosts([]);
           }
         } finally {
-          if (active) {
+          if (active && showLoading) {
             setIsLoading(false);
           }
+          inFlight = false;
         }
       };
 
-      loadRuns();
+      loadRuns({ showLoading: true });
+      const intervalId = setInterval(() => {
+        void loadRuns();
+      }, POLL_INTERVAL_MS);
       return () => {
         active = false;
+        clearInterval(intervalId);
       };
     }, [])
   );

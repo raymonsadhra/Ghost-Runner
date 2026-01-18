@@ -36,6 +36,10 @@ const DEFAULT_BOSS_PHASES = [
   { threshold: 0.5, multiplier: 1.08 },
   { threshold: 0.75, multiplier: 1.15 },
 ];
+const POWER_UP_DESCRIPTIONS = {
+  freeze: 'Freezes the ghost timer.',
+  slow: 'Slows the ghost by 20%.',
+};
 
 function getGhostDurationMs(points = []) {
   if (points.length < 2) return 0;
@@ -105,6 +109,8 @@ export default function GhostRunScreen({ navigation, route }) {
   const userPointsRef = useRef([]);
   const powerUpsRef = useRef([]);
   const powerUpEffectsRef = useRef({ freezeUntil: 0, slowUntil: 0 });
+  const primedAudioRef = useRef(false);
+  const lastAudioLogRef = useRef(0);
   const nextMilestoneRef = useRef(MILESTONE_FIRST_MILE_METERS);
   const milestoneTimeoutRef = useRef(null);
 
@@ -193,9 +199,35 @@ export default function GhostRunScreen({ navigation, route }) {
         ghostTimeRef.current = 0;
         powerUpEffectsRef.current = { freezeUntil: 0, slowUntil: 0 };
         setActivePowerUp(null);
+        setMilestoneToast(null);
+        nextMilestoneRef.current = MILESTONE_FIRST_MILE_METERS;
+        if (milestoneTimeoutRef.current) {
+          clearTimeout(milestoneTimeoutRef.current);
+          milestoneTimeoutRef.current = null;
+        }
         await trackerRef.current.start();
         if (active) {
           setIsRunning(true);
+          const sourceFlags = Object.fromEntries(
+            Object.entries(audioManagerRef.current.sources || {}).map(
+              ([key, value]) => [key, Boolean(value)]
+            )
+          );
+          console.log('[Audio] ghost run start', {
+            enabled: audioManagerRef.current.enabled,
+            sources: sourceFlags,
+          });
+          audioManagerRef.current.setAlwaysOn(true);
+          try {
+            await audioManagerRef.current.ready;
+            await audioManagerRef.current.playBreathing(0.6, 0);
+            await audioManagerRef.current.playFootsteps(0.4, 0);
+            primedAudioRef.current = true;
+            console.log('[Audio] ghost run primed');
+          } catch (error) {
+            primedAudioRef.current = false;
+            console.log('[Audio] ghost run prime failed', error?.message ?? error);
+          }
         }
       } catch (error) {
         if (active) {
@@ -230,8 +262,11 @@ export default function GhostRunScreen({ navigation, route }) {
         setGhostPosition(null);
         setDelta(0);
         setActivePowerUp(null);
-        audioManagerRef.current.setAlwaysOn(false);
-        audioManagerRef.current.stopAll();
+        audioManagerRef.current.setAlwaysOn(true);
+        if (!primedAudioRef.current) {
+          void audioManagerRef.current.updateAudio(-60, { forceAmbient: true });
+          primedAudioRef.current = true;
+        }
         ghostTimeRef.current = 0;
         lastTickRef.current = now;
         if (isBoss) {
@@ -252,15 +287,18 @@ export default function GhostRunScreen({ navigation, route }) {
       const slowRemaining = Math.max(0, effects.slowUntil - now);
       let powerMultiplier = 1;
       let powerLabel = null;
+      let powerDescription = null;
       let powerRemaining = 0;
 
       if (freezeRemaining > 0) {
         powerMultiplier = 0;
         powerLabel = 'Time Warp';
+        powerDescription = POWER_UP_DESCRIPTIONS.freeze;
         powerRemaining = freezeRemaining;
       } else if (slowRemaining > 0) {
         powerMultiplier = 0.8;
         powerLabel = 'Adrenaline Rush';
+        powerDescription = POWER_UP_DESCRIPTIONS.slow;
         powerRemaining = slowRemaining;
       }
 
@@ -283,7 +321,19 @@ export default function GhostRunScreen({ navigation, route }) {
         ghostTimeMs
       );
       setDelta(currentDelta);
-      audioManagerRef.current.updateAudio(currentDelta, { forceAmbient: true });
+      void audioManagerRef.current
+        .updateAudio(currentDelta, { forceAmbient: true })
+        .catch((error) => {
+          console.log('[Audio] updateAudio error', error?.message ?? error);
+        });
+      if (now - lastAudioLogRef.current > 5000) {
+        lastAudioLogRef.current = now;
+        console.log('[Audio] updateAudio tick', {
+          delta: Number(currentDelta.toFixed(1)),
+          boss: isBoss,
+          power: powerLabel,
+        });
+      }
 
       if (isBoss) {
         const ghostDistance =
@@ -301,6 +351,7 @@ export default function GhostRunScreen({ navigation, route }) {
       if (powerLabel) {
         setActivePowerUp({
           label: powerLabel,
+          description: powerDescription,
           remainingSec: Math.ceil(powerRemaining / 1000),
         });
       } else {
@@ -468,6 +519,11 @@ export default function GhostRunScreen({ navigation, route }) {
             <Text style={styles.powerUpText}>
               {activePowerUp.label} • {activePowerUp.remainingSec}s
             </Text>
+            {activePowerUp.description ? (
+              <Text style={styles.powerUpDescription}>
+                {activePowerUp.description}
+              </Text>
+            ) : null}
           </View>
         )}
         {milestoneToast && (
@@ -636,6 +692,12 @@ const styles = StyleSheet.create({
   powerUpText: {
     color: theme.colors.text,
     fontWeight: '700',
+  },
+  powerUpDescription: {
+    color: theme.colors.text,
+    fontSize: 12,
+    opacity: 0.85,
+    marginTop: 2,
   },
   milestoneChip: {
     marginTop: theme.spacing.sm,

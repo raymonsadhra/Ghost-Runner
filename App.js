@@ -5,8 +5,9 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
-import { auth } from './src/firebase';
+import { auth, db } from './src/firebase';
 import { onAuthStateChanged, signInWithEmailAndPassword, signInAnonymously, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
+import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 
 import HomeScreen from './src/screens/HomeScreen';
 import RunScreen from './src/screens/RunScreen';
@@ -28,15 +29,69 @@ const Tab = createBottomTabNavigator();
 
 // --------- Login Screen ---------
 function LoginScreen() {
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
 
+  const createUserDocument = async (userId, userEmail, userName) => {
+    try {
+      const userRef = doc(db, 'Users', userId);
+      const userSnap = await getDoc(userRef);
+      
+      if (!userSnap.exists()) {
+        // Create user document in Firestore
+        const userData = {
+          userId,
+          name: userName || 'Runner',
+          displayName: userName || 'Runner',
+          createdAt: serverTimestamp(),
+          totalRuns: 0,
+          totalDistance: 0,
+          lastRunAt: null,
+        };
+        
+        // Only add email if provided (not for anonymous users)
+        if (userEmail) {
+          userData.email = userEmail;
+        }
+        
+        await setDoc(userRef, userData);
+        console.log(`Created user document in Firestore: ${userId}`);
+      } else {
+        // Update existing user document with name/email if they're missing
+        const userData = userSnap.data();
+        const updates = {};
+        
+        if (!userData.name || !userData.displayName) {
+          updates.name = userName || userData.name || 'Runner';
+          updates.displayName = userName || userData.displayName || 'Runner';
+        }
+        
+        if (userEmail && !userData.email) {
+          updates.email = userEmail;
+        }
+        
+        if (Object.keys(updates).length > 0) {
+          await setDoc(userRef, { ...userData, ...updates }, { merge: true });
+        }
+      }
+    } catch (error) {
+      console.error('Error creating/updating user document:', error);
+      // Don't throw - auth succeeded, Firestore doc creation is secondary
+    }
+  };
+
   const handleEmailAuth = async () => {
     if (!email.trim() || !password.trim()) {
       setError('Please enter both email and password');
+      return;
+    }
+
+    if (isSignUp && !name.trim()) {
+      setError('Please enter your name');
       return;
     }
 
@@ -45,10 +100,18 @@ function LoginScreen() {
     try {
       if (isSignUp) {
         // Sign up
-        await createUserWithEmailAndPassword(auth, email.trim(), password);
+        const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
+        // Create user document in Firestore
+        await createUserDocument(userCredential.user.uid, email.trim(), name.trim());
       } else {
         // Sign in
-        await signInWithEmailAndPassword(auth, email.trim(), password);
+        const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
+        // Ensure user document exists (in case it was created before we added this feature)
+        const userRef = doc(db, 'Users', userCredential.user.uid);
+        const userSnap = await getDoc(userRef);
+        if (!userSnap.exists()) {
+          await createUserDocument(userCredential.user.uid, email.trim(), 'Runner');
+        }
       }
     } catch (err) {
       console.error(`${isSignUp ? 'Sign up' : 'Sign in'} error:`, err);
@@ -73,7 +136,9 @@ function LoginScreen() {
     setError(null);
     setLoading(true);
     try {
-      await signInAnonymously(auth);
+      const userCredential = await signInAnonymously(auth);
+      // Create user document for anonymous user
+      await createUserDocument(userCredential.user.uid, null, 'Guest');
     } catch (err) {
       console.error('Anonymous login error:', err);
       if (err.code === 'auth/admin-restricted-operation') {
@@ -109,6 +174,23 @@ function LoginScreen() {
         )}
 
         <View style={loginStyles.form}>
+          {isSignUp && (
+            <View style={loginStyles.inputContainer}>
+              <Text style={loginStyles.label}>Name</Text>
+              <TextInput
+                style={loginStyles.input}
+                placeholder="Your name"
+                placeholderTextColor={theme.colors.textSoft}
+                value={name}
+                onChangeText={setName}
+                autoCapitalize="words"
+                autoCorrect={false}
+                textContentType="name"
+                editable={!loading}
+              />
+            </View>
+          )}
+
           <View style={loginStyles.inputContainer}>
             <Text style={loginStyles.label}>Email</Text>
             <TextInput
@@ -156,6 +238,10 @@ function LoginScreen() {
             onPress={() => {
               setIsSignUp(!isSignUp);
               setError(null);
+              if (!isSignUp) {
+                // Clear name when switching to sign in
+                setName('');
+              }
             }}
             disabled={loading}
           >
