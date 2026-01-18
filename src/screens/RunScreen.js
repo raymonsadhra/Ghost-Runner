@@ -5,7 +5,23 @@ import MapView, { Polyline } from 'react-native-maps';
 import { LocationTracker } from '../services/LocationTracker';
 import { calculateTotalDistance } from '../utils/geoUtils';
 import { saveRun } from '../services/firebaseService';
+import { createBossGhostIfEligible } from '../services/bossGhostService';
+import { awardRunXp } from '../services/rewardService';
 import { theme } from '../theme';
+
+const PRIMARY_BLUE = '#2F6BFF';
+const CARD_BG = '#121A2A';
+const CARD_BORDER = '#1E2A3C';
+const MUTED_TEXT = '#8FA4BF';
+const MAP_STYLE = [
+  { elementType: 'geometry', stylers: [{ color: '#0B0F17' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#8FA4BF' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#0B0F17' }] },
+  { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#111827' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0B2239' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#101826' }] },
+  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#1B2A40' }] },
+];
 
 const DEFAULT_REGION = {
   latitude: 37.7749,
@@ -34,6 +50,7 @@ export default function RunScreen({ navigation }) {
   const [distance, setDistance] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
+  const pace = distance > 0 ? (duration / 60) / (distance / 1000) : 0;
 
   const handlePoint = useCallback((point, allPoints) => {
     setPoints([...allPoints]);
@@ -79,15 +96,32 @@ export default function RunScreen({ navigation }) {
 
     const route = trackerRef.current.getRoute();
     const routeDistance = calculateTotalDistance(route);
+    const runName = `Run on ${new Date().toLocaleDateString()}`;
     const payload = {
       points: route,
       distance: routeDistance,
       duration,
       timestamp: Date.now(),
+      name: runName,
     };
 
     try {
-      await saveRun(payload);
+      const saveResult = await saveRun(payload);
+      awardRunXp({
+        runId: saveResult?.id,
+        localId: saveResult?.localId,
+      }).catch(() => null);
+      createBossGhostIfEligible().catch(() => null);
+      navigation.navigate('Summary', {
+        routePoints: route,
+        distance: routeDistance,
+        duration,
+        runId: saveResult?.id ?? null,
+        runLocalId: saveResult?.localId ?? null,
+        runLocalOnly: saveResult?.source === 'local',
+        runName,
+      });
+      return;
     } catch (error) {
       // Swallow for now; summary will still render locally.
     } finally {
@@ -98,6 +132,7 @@ export default function RunScreen({ navigation }) {
       routePoints: route,
       distance: routeDistance,
       duration,
+      runName,
     });
   };
 
@@ -108,25 +143,38 @@ export default function RunScreen({ navigation }) {
         showsUserLocation
         followsUserLocation
         initialRegion={getInitialRegion(points)}
+        customMapStyle={MAP_STYLE}
       >
         <Polyline
           coordinates={points}
-          strokeColor={theme.colors.secondary}
+          strokeColor="rgba(47, 107, 255, 0.25)"
+          strokeWidth={8}
+          lineCap="round"
+        />
+        <Polyline
+          coordinates={points}
+          strokeColor={PRIMARY_BLUE}
           strokeWidth={4}
+          lineCap="round"
         />
       </MapView>
 
       <View style={styles.stats}>
-        <View style={styles.statItem}>
+        <View style={styles.statBlock}>
           <Text style={styles.statLabel}>Distance</Text>
-          <Text style={styles.statValue}>{(distance / 1000).toFixed(2)}</Text>
-          <Text style={styles.statUnit}>km</Text>
+          <Text style={styles.statValue}>{(distance / 1000).toFixed(2)} km</Text>
         </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
+        <View style={styles.statBlock}>
           <Text style={styles.statLabel}>Time</Text>
           <Text style={styles.statValue}>
-            {Math.floor(duration / 60)}:{(duration % 60).toString().padStart(2, '0')}
+            {Math.floor(duration / 60)}:
+            {(duration % 60).toString().padStart(2, '0')}
+          </Text>
+        </View>
+        <View style={styles.statBlock}>
+          <Text style={styles.statLabel}>Pace</Text>
+          <Text style={styles.statValue}>
+            {pace > 0 ? pace.toFixed(2) : '0.00'} /km
           </Text>
         </View>
       </View>
@@ -135,7 +183,6 @@ export default function RunScreen({ navigation }) {
         style={[styles.button, isRunning ? styles.stopButton : styles.startButton]}
         onPress={isRunning ? stopRun : startRun}
         disabled={isSaving}
-        activeOpacity={0.8}
       >
         <Text style={styles.buttonText}>
           {isSaving ? 'SAVING...' : isRunning ? 'STOP' : 'START'}
@@ -157,65 +204,47 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 70,
     alignSelf: 'center',
-    backgroundColor: 'rgba(15, 20, 27, 0.95)',
+    backgroundColor: CARD_BG,
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.md,
-    borderRadius: theme.radius.xl,
+    borderRadius: theme.radius.lg,
     flexDirection: 'row',
-    alignItems: 'center',
-    minWidth: 280,
-    ...theme.shadows.lg,
+    minWidth: 260,
     borderWidth: 1,
-    borderColor: theme.colors.slate,
+    borderColor: CARD_BORDER,
   },
-  statItem: {
+  statBlock: {
     flex: 1,
     alignItems: 'center',
   },
   statLabel: {
-    color: theme.colors.mist,
-    opacity: 0.7,
-    fontSize: 11,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: theme.spacing.xs,
+    color: MUTED_TEXT,
+    fontSize: 12,
+    marginBottom: 4,
   },
   statValue: {
     color: theme.colors.mist,
-    fontSize: 24,
-    fontWeight: '800',
-    marginBottom: 2,
-  },
-  statUnit: {
-    color: theme.colors.mist,
-    opacity: 0.6,
-    fontSize: 12,
-  },
-  statDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: theme.colors.slate,
-    marginHorizontal: theme.spacing.md,
+    fontSize: 16,
+    fontWeight: '700',
   },
   button: {
     position: 'absolute',
-    bottom: 50,
+    bottom: 40,
     alignSelf: 'center',
-    paddingHorizontal: 80,
-    paddingVertical: 20,
+    paddingHorizontal: 60,
+    paddingVertical: 18,
     borderRadius: 999,
-    ...theme.shadows.lg,
   },
   startButton: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: PRIMARY_BLUE,
   },
   stopButton: {
     backgroundColor: theme.colors.danger,
   },
   buttonText: {
-    color: theme.colors.ink,
+    color: 'white',
     fontSize: 18,
     fontWeight: '800',
-    letterSpacing: 2,
+    letterSpacing: 1,
   },
 });

@@ -1,0 +1,375 @@
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  SafeAreaView,
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  Modal,
+  TextInput,
+  Alert,
+} from 'react-native';
+import { getUserRuns, updateRunName, deleteRun } from '../services/firebaseService';
+import { theme } from '../theme';
+
+const RUNS_LIMIT = 50;
+
+function formatDate(timestamp) {
+  return new Date(timestamp ?? Date.now()).toLocaleDateString();
+}
+
+function getRunTitle(run) {
+  const trimmed = run.name?.trim();
+  return trimmed || formatDate(run.timestamp);
+}
+
+function buildRunMeta(run, includeDate) {
+  const distanceKm = (run.distance ?? 0) / 1000;
+  const durationMin = Math.floor((run.duration ?? 0) / 60);
+  const pace = distanceKm > 0 ? (run.duration / 60) / distanceKm : 0;
+  const parts = [];
+  if (includeDate) {
+    parts.push(formatDate(run.timestamp));
+  }
+  parts.push(`${distanceKm.toFixed(2)} km`);
+  parts.push(`${durationMin} min`);
+  parts.push(`Pace ${pace.toFixed(2)} min/km`);
+  return parts.join(' • ');
+}
+
+export default function RunHistoryScreen() {
+  const [runs, setRuns] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [editingRun, setEditingRun] = useState(null);
+  const [editName, setEditName] = useState('');
+  const [isSavingName, setIsSavingName] = useState(false);
+
+  const loadRuns = useCallback(async () => {
+    try {
+      const data = await getUserRuns(undefined, { max: RUNS_LIMIT });
+      setRuns(data);
+    } catch (error) {
+      setRuns([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      setIsLoading(true);
+      try {
+        const data = await getUserRuns(undefined, { max: RUNS_LIMIT });
+        if (active) {
+          setRuns(data);
+        }
+      } catch (error) {
+        if (active) {
+          setRuns([]);
+        }
+      } finally {
+        if (active) {
+          setIsLoading(false);
+        }
+      }
+    };
+    load();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await loadRuns();
+    setIsRefreshing(false);
+  };
+
+  const openRename = (run) => {
+    setEditingRun(run);
+    setEditName(run.name?.trim() || formatDate(run.timestamp));
+  };
+
+  const closeRename = () => {
+    setEditingRun(null);
+    setEditName('');
+  };
+
+  const handleSaveName = async () => {
+    if (!editingRun) return;
+    const trimmed = editName.trim();
+    const nextName = trimmed || formatDate(editingRun.timestamp);
+    const currentName =
+      editingRun.name?.trim() || formatDate(editingRun.timestamp);
+
+    if (nextName === currentName) {
+      closeRename();
+      return;
+    }
+
+    setIsSavingName(true);
+    try {
+      await updateRunName(editingRun.id, nextName, {
+        localId: editingRun.localId,
+        localOnly: editingRun.localOnly,
+      });
+      setRuns((prev) =>
+        prev.map((run) =>
+          run.id === editingRun.id ? { ...run, name: nextName } : run
+        )
+      );
+      closeRename();
+    } finally {
+      setIsSavingName(false);
+    }
+  };
+
+  const confirmDelete = (run) => {
+    Alert.alert('Delete this run?', 'This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteRun(run.id, {
+            localId: run.localId,
+            localOnly: run.localOnly,
+          });
+          setRuns((prev) => prev.filter((item) => item.id !== run.id));
+        },
+      },
+    ]);
+  };
+
+  const renderRun = ({ item }) => {
+    const title = getRunTitle(item);
+    const includeDate = Boolean(item.name?.trim());
+    const meta = buildRunMeta(item, includeDate);
+
+    return (
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>{title}</Text>
+        <Text style={styles.cardMeta}>{meta}</Text>
+        <View style={styles.cardActions}>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.renameButton]}
+            onPress={() => openRename(item)}
+          >
+            <Text style={styles.actionText}>Rename</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.deleteButton]}
+            onPress={() => confirmDelete(item)}
+          >
+            <Text style={styles.actionText}>Delete</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Run History</Text>
+        <Text style={styles.subtitle}>
+          {isLoading ? 'Loading...' : `${runs.length} runs`}
+        </Text>
+      </View>
+
+      <FlatList
+        data={runs}
+        renderItem={renderRun}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.list}
+        refreshing={isRefreshing}
+        onRefresh={handleRefresh}
+        ListEmptyComponent={
+          !isLoading ? (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyText}>
+                No runs yet. Finish a run to see it here.
+              </Text>
+            </View>
+          ) : null
+        }
+      />
+
+      <Modal
+        visible={Boolean(editingRun)}
+        transparent
+        animationType="fade"
+        onRequestClose={closeRename}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Rename run</Text>
+            <TextInput
+              value={editName}
+              onChangeText={setEditName}
+              placeholder="Run name"
+              placeholderTextColor="rgba(233, 242, 244, 0.5)"
+              style={styles.modalInput}
+              autoFocus
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancel]}
+                onPress={closeRename}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalButton,
+                  styles.modalSave,
+                  isSavingName && styles.modalSaveDisabled,
+                ]}
+                onPress={handleSaveName}
+                disabled={isSavingName}
+              >
+                <Text style={styles.modalSaveText}>
+                  {isSavingName ? 'Saving...' : 'Save'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: theme.colors.ink,
+  },
+  header: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.lg,
+    paddingBottom: theme.spacing.md,
+  },
+  title: {
+    color: theme.colors.mist,
+    fontSize: 26,
+    fontWeight: '700',
+  },
+  subtitle: {
+    color: theme.colors.mist,
+    opacity: 0.6,
+    marginTop: 4,
+  },
+  list: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingBottom: theme.spacing.xl,
+  },
+  card: {
+    backgroundColor: '#121A2A',
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: '#1E2A3C',
+  },
+  cardTitle: {
+    color: theme.colors.mist,
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  cardMeta: {
+    color: theme.colors.mist,
+    opacity: 0.7,
+    marginTop: 6,
+  },
+  cardActions: {
+    flexDirection: 'row',
+    marginTop: theme.spacing.md,
+  },
+  actionButton: {
+    flex: 1,
+    borderRadius: theme.radius.md,
+    paddingVertical: theme.spacing.sm,
+    alignItems: 'center',
+  },
+  renameButton: {
+    backgroundColor: theme.colors.secondary,
+    marginRight: theme.spacing.sm,
+  },
+  deleteButton: {
+    backgroundColor: theme.colors.danger,
+  },
+  actionText: {
+    color: theme.colors.mist,
+    fontWeight: '700',
+  },
+  emptyCard: {
+    backgroundColor: '#121A2A',
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.lg,
+    borderWidth: 1,
+    borderColor: '#1E2A3C',
+  },
+  emptyText: {
+    color: theme.colors.mist,
+    opacity: 0.7,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 20, 27, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: theme.spacing.lg,
+  },
+  modalCard: {
+    width: '100%',
+    backgroundColor: '#121A2A',
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.lg,
+  },
+  modalTitle: {
+    color: theme.colors.mist,
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: theme.spacing.sm,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: '#1E2A3C',
+    borderRadius: theme.radius.md,
+    color: theme.colors.mist,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
+    backgroundColor: '#0F1626',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  modalButton: {
+    borderRadius: theme.radius.md,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.lg,
+  },
+  modalCancel: {
+    borderWidth: 1,
+    borderColor: '#1E2A3C',
+    marginRight: theme.spacing.sm,
+  },
+  modalCancelText: {
+    color: theme.colors.mist,
+    fontWeight: '600',
+  },
+  modalSave: {
+    backgroundColor: theme.colors.primary,
+  },
+  modalSaveDisabled: {
+    opacity: 0.6,
+  },
+  modalSaveText: {
+    color: theme.colors.mist,
+    fontWeight: '700',
+  },
+});

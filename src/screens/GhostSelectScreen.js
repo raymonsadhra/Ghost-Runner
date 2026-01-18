@@ -5,25 +5,42 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
-import { getUserRuns } from '../services/firebaseService';
+import { deleteRun, getUserRuns } from '../services/firebaseService';
+import {
+  createBossGhostIfEligible,
+  deleteBossGhost,
+  getBossGhosts,
+} from '../services/bossGhostService';
 import { theme } from '../theme';
 
 export default function GhostSelectScreen({ navigation }) {
   const [runs, setRuns] = useState([]);
+  const [bossGhosts, setBossGhosts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
     const loadRuns = async () => {
       try {
-        const data = await getUserRuns();
+        const [runsData, bossData] = await Promise.all([
+          getUserRuns(),
+          getBossGhosts(),
+        ]);
+        let nextBossData = bossData;
+        if (bossData.length === 0 && runsData.length >= 5) {
+          await createBossGhostIfEligible();
+          nextBossData = await getBossGhosts();
+        }
         if (active) {
-          setRuns(data);
+          setRuns(runsData);
+          setBossGhosts(nextBossData);
         }
       } catch (error) {
         if (active) {
           setRuns([]);
+          setBossGhosts([]);
         }
       } finally {
         if (active) {
@@ -38,86 +55,123 @@ export default function GhostSelectScreen({ navigation }) {
     };
   }, []);
 
+  const handleDelete = (item) => {
+    Alert.alert(
+      'Delete this ghost?',
+      item.type === 'boss'
+        ? 'This boss ghost will be removed.'
+        : 'This run will be removed.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            if (item.type === 'boss') {
+              await deleteBossGhost(item.id, {
+                localId: item.localId,
+                localOnly: item.localOnly,
+              });
+              setBossGhosts((prev) => prev.filter((ghost) => ghost.id !== item.id));
+            } else {
+              await deleteRun(item.id, {
+                localId: item.localId,
+                localOnly: item.localOnly,
+              });
+              setRuns((prev) => prev.filter((run) => run.id !== item.id));
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const renderRun = ({ item }) => {
-    const distanceKm = item.distanceKm || (item.distance ?? 0) / 1000;
-    const durationMin = item.durationMin || Math.floor((item.duration ?? 0) / 60);
-    const pace = item.pace || (distanceKm > 0 ? (item.duration / 60) / distanceKm : 0);
-    const runDate = new Date(item.timestamp ?? Date.now());
+    const distanceKm = (item.distance ?? 0) / 1000;
+    const durationMin = Math.floor((item.duration ?? 0) / 60);
+    const pace = distanceKm > 0 ? (item.duration / 60) / distanceKm : 0;
+    const isBoss = item.type === 'boss';
+    const bossPalette = item.character?.palette;
+    const bossAccent = bossPalette?.primary ?? theme.colors.primary;
 
     return (
       <TouchableOpacity
-        style={styles.card}
+        style={[
+          styles.card,
+          isBoss && styles.bossCard,
+          isBoss && bossPalette?.secondary
+            ? { backgroundColor: bossPalette.secondary }
+            : null,
+        ]}
         onPress={() =>
           navigation.navigate('GhostRun', {
-            ghostRoute: item.points,
+            ghostRoute: item.route ?? item.points,
             ghostMeta: item,
           })
         }
-        activeOpacity={0.7}
       >
-        <View style={styles.cardContent}>
-          <View style={styles.cardLeft}>
-            <View style={styles.ghostIconContainer}>
-              <Text style={styles.ghostIcon}>👻</Text>
-            </View>
-            <View style={styles.cardInfo}>
-              <Text style={styles.cardDate}>
-                {runDate.toLocaleDateString('en-US', { 
-                  month: 'short', 
-                  day: 'numeric',
-                  year: 'numeric'
-                })}
-              </Text>
-              <Text style={styles.cardDistance}>
-                {distanceKm.toFixed(2)} km
-              </Text>
-            </View>
-          </View>
-          <View style={styles.cardRight}>
-            <View style={styles.cardStats}>
-              <Text style={styles.cardStatLabel}>Time</Text>
-              <Text style={styles.cardStatValue}>
-                {Math.floor((item.duration ?? 0) / 60)}:{(item.duration ?? 0) % 60}
-              </Text>
-            </View>
-            <View style={styles.cardStats}>
-              <Text style={styles.cardStatLabel}>Pace</Text>
-              <Text style={styles.cardStatValue}>{pace.toFixed(2)}</Text>
-            </View>
-          </View>
+        <View style={styles.cardHeader}>
+          <Text
+            style={[
+              styles.cardTitle,
+              isBoss ? { color: theme.colors.mist } : null,
+            ]}
+          >
+            {item.name?.trim() ||
+              new Date(item.timestamp ?? Date.now()).toLocaleDateString()}
+          </Text>
+          <Text
+            style={[
+              styles.cardBadge,
+              isBoss && styles.bossBadge,
+              isBoss && bossPalette?.primary
+                ? { backgroundColor: bossPalette.primary }
+                : null,
+            ]}
+          >
+            {isBoss ? 'Boss' : 'Ghost'}
+          </Text>
         </View>
-        <View style={styles.cardArrow}>
-          <Text style={styles.cardArrowText}>→</Text>
+        <Text style={styles.cardMeta}>
+          {distanceKm.toFixed(2)} km • {durationMin} min
+        </Text>
+        <Text style={styles.cardMeta}>
+          Pace {pace.toFixed(2)} min/km
+        </Text>
+        {isBoss && (
+          <Text style={[styles.bossMeta, { color: bossAccent }]}>
+            {item.character?.title ?? 'Milestone boss battle'}
+          </Text>
+        )}
+        <View style={styles.cardActions}>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.deleteButton]}
+            onPress={() => handleDelete(item)}
+          >
+            <Text style={styles.actionText}>Delete</Text>
+          </TouchableOpacity>
         </View>
       </TouchableOpacity>
     );
   };
 
+  const ghostOptions = [...bossGhosts, ...runs];
+
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Choose Your Ghost</Text>
-        <Text style={styles.subtitle}>Select a run to race against</Text>
-      </View>
+      <Text style={styles.title}>Choose Your Ghost</Text>
       {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loading}>Loading runs...</Text>
-        </View>
+        <Text style={styles.loading}>Loading runs...</Text>
       ) : (
         <FlatList
-          data={runs}
+          data={ghostOptions}
           renderItem={renderRun}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
-          showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <View style={styles.emptyCard}>
-              <Text style={styles.emptyIcon}>👻</Text>
               <Text style={styles.emptyText}>
-                No runs yet
-              </Text>
-              <Text style={styles.emptySubtext}>
-                Record a run to create your first ghost
+                No runs yet. Record a run to create your first ghost.
               </Text>
             </View>
           }
@@ -131,131 +185,93 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.ink,
-  },
-  header: {
-    paddingHorizontal: theme.spacing.lg,
     paddingTop: theme.spacing.lg,
-    paddingBottom: theme.spacing.md,
   },
   title: {
     color: theme.colors.mist,
-    ...theme.typography.h2,
-    marginBottom: theme.spacing.xs,
-  },
-  subtitle: {
-    color: theme.colors.mist,
-    opacity: 0.6,
-    fontSize: 14,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    fontSize: 26,
+    fontWeight: '700',
+    paddingHorizontal: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
   },
   loading: {
     color: theme.colors.mist,
     opacity: 0.7,
-    fontSize: 16,
+    paddingHorizontal: theme.spacing.lg,
   },
   list: {
     paddingHorizontal: theme.spacing.lg,
     paddingBottom: theme.spacing.xl,
   },
   card: {
-    backgroundColor: theme.colors.surfaceLight,
-    borderRadius: theme.radius.xl,
+    backgroundColor: '#121A2A',
+    borderRadius: theme.radius.lg,
     padding: theme.spacing.lg,
     marginBottom: theme.spacing.md,
-    ...theme.shadows.md,
+    borderWidth: 1,
+    borderColor: '#1E2A3C',
+  },
+  bossCard: {
+    borderWidth: 1,
+    borderColor: 'rgba(47, 107, 255, 0.6)',
+  },
+  cardHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  cardContent: {
-    flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: theme.spacing.sm,
   },
-  cardLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  ghostIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: theme.colors.accent,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: theme.spacing.md,
-  },
-  ghostIcon: {
-    fontSize: 28,
-  },
-  cardInfo: {
-    flex: 1,
-  },
-  cardDate: {
-    color: theme.colors.mist,
-    fontSize: 14,
-    opacity: 0.7,
-    marginBottom: theme.spacing.xs,
-  },
-  cardDistance: {
-    color: theme.colors.mist,
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  cardRight: {
-    flexDirection: 'row',
-    gap: theme.spacing.md,
-  },
-  cardStats: {
-    alignItems: 'flex-end',
-  },
-  cardStatLabel: {
-    color: theme.colors.mist,
-    opacity: 0.6,
-    fontSize: 11,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: theme.spacing.xs,
-  },
-  cardStatValue: {
-    color: theme.colors.mist,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  cardArrow: {
-    marginLeft: theme.spacing.sm,
-  },
-  cardArrowText: {
-    color: theme.colors.mist,
-    opacity: 0.5,
-    fontSize: 20,
-  },
-  emptyCard: {
-    backgroundColor: theme.colors.surfaceLight,
-    borderRadius: theme.radius.xl,
-    padding: theme.spacing.xxl,
-    alignItems: 'center',
-    marginTop: theme.spacing.xl,
-  },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: theme.spacing.md,
-  },
-  emptyText: {
+  cardTitle: {
     color: theme.colors.mist,
     fontSize: 18,
     fontWeight: '700',
-    marginBottom: theme.spacing.xs,
   },
-  emptySubtext: {
+  cardBadge: {
     color: theme.colors.mist,
-    opacity: 0.6,
-    fontSize: 14,
-    textAlign: 'center',
+    backgroundColor: theme.colors.accent,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 4,
+    borderRadius: theme.radius.sm,
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  bossBadge: {
+    backgroundColor: theme.colors.primary,
+  },
+  cardMeta: {
+    color: theme.colors.mist,
+    opacity: 0.7,
+    marginTop: 4,
+  },
+  bossMeta: {
+    color: theme.colors.accent,
+    marginTop: theme.spacing.sm,
+    fontWeight: '600',
+  },
+  cardActions: {
+    marginTop: theme.spacing.md,
+  },
+  actionButton: {
+    borderRadius: theme.radius.md,
+    paddingVertical: theme.spacing.sm,
+    alignItems: 'center',
+  },
+  deleteButton: {
+    backgroundColor: theme.colors.danger,
+  },
+  actionText: {
+    color: theme.colors.mist,
+    fontWeight: '700',
+  },
+  emptyCard: {
+    backgroundColor: '#121A2A',
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.lg,
+    borderWidth: 1,
+    borderColor: '#1E2A3C',
+  },
+  emptyText: {
+    color: theme.colors.mist,
+    opacity: 0.7,
   },
 });

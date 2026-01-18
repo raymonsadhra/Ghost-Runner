@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   SafeAreaView,
   View,
@@ -7,8 +7,15 @@ import {
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { theme } from '../theme';
 import { getUserRuns } from '../services/firebaseService';
+
+const PRIMARY_BLUE = '#2F6BFF';
+const DARK_BG = '#0B0F17';
+const CARD_BG = '#121A2A';
+const CARD_BORDER = '#1E2A3C';
+const MUTED_TEXT = '#8FA4BF';
 
 function getWeekStart(timestamp) {
   const date = new Date(timestamp);
@@ -22,30 +29,33 @@ export default function HomeScreen({ navigation }) {
   const [runs, setRuns] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    let active = true;
-    const loadRuns = async () => {
-      try {
-        const data = await getUserRuns();
-        if (active) {
-          setRuns(data);
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      const loadRuns = async () => {
+        setIsLoading(true);
+        try {
+          const data = await getUserRuns();
+          if (active) {
+            setRuns(data);
+          }
+        } catch (error) {
+          if (active) {
+            setRuns([]);
+          }
+        } finally {
+          if (active) {
+            setIsLoading(false);
+          }
         }
-      } catch (error) {
-        if (active) {
-          setRuns([]);
-        }
-      } finally {
-        if (active) {
-          setIsLoading(false);
-        }
-      }
-    };
+      };
 
-    loadRuns();
-    return () => {
-      active = false;
-    };
-  }, []);
+      loadRuns();
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
 
   const summary = useMemo(() => {
     const weekStart = getWeekStart(Date.now());
@@ -59,80 +69,103 @@ export default function HomeScreen({ navigation }) {
   }, [runs]);
 
   const recentRuns = runs.slice(0, 3);
+  const goalKm = 10;
+  const progressKm = Math.min(goalKm, summary.distanceKm);
+  const progressPercent = goalKm > 0 ? progressKm / goalKm : 0;
 
   return (
     <SafeAreaView style={styles.safe}>
-      <View style={styles.background}>
-        <View style={[styles.orb, styles.orbOne]} />
-        <View style={[styles.orb, styles.orbTwo]} />
-        <View style={[styles.orb, styles.orbThree]} />
-      </View>
-      <ScrollView 
-        contentContainerStyle={styles.container}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.kicker}>GHOST RUNNER</Text>
-          <Text style={styles.title}>Race your past</Text>
-          <Text style={styles.subtitle}>Challenge yourself to beat your best</Text>
+          <View style={styles.headerLeft}>
+            <TouchableOpacity style={styles.iconButton}>
+              <Text style={styles.iconText}>+</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.iconButton}>
+              <Text style={styles.iconText}>?</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.headerTitle}>Home</Text>
+          <View style={styles.headerRight}>
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={() => navigation.navigate('Profile')}
+            >
+              <Text style={styles.iconText}>Me</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
-        <View style={styles.actions}>
-          <TouchableOpacity
-            style={[styles.actionCard, styles.primaryCard]}
-            onPress={() => navigation.navigate('Run')}
-            activeOpacity={0.8}
-          >
-            <View style={styles.actionIconContainer}>
-              <View style={[styles.actionIcon, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-                <Text style={styles.actionIconText}>▶</Text>
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Suggested Goal</Text>
+            <TouchableOpacity>
+              <Text style={styles.sectionLink}>Customize</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.goalCard}>
+            <View style={styles.goalIcon} />
+            <View style={styles.goalContent}>
+              <Text style={styles.goalTitle}>{goalKm} km per week</Text>
+              <Text style={styles.goalMeta}>
+                {progressKm.toFixed(1)} km / {goalKm} km run
+              </Text>
+              <View style={styles.goalProgress}>
+                <View
+                  style={[
+                    styles.goalProgressFill,
+                    { width: `${Math.round(progressPercent * 100)}%` },
+                  ]}
+                />
               </View>
             </View>
-            <Text style={styles.actionTitle}>Start New Run</Text>
-            <Text style={styles.actionSubtitle}>Track a fresh route</Text>
-          </TouchableOpacity>
+            <TouchableOpacity style={styles.goalButton}>
+              <Text style={styles.goalButtonText}>Set Goal</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
+        <View style={styles.section}>
+          <Text style={styles.readyTitle}>Ready to get moving?</Text>
+          <Text style={styles.readyMeta}>
+            Choose a run and hit start. Your stats will be waiting.
+          </Text>
           <TouchableOpacity
-            style={[styles.actionCard, styles.secondaryCard]}
-            onPress={() => navigation.navigate('GhostSelect')}
-            activeOpacity={0.8}
+            style={styles.primaryAction}
+            onPress={() => navigation.navigate('Run')}
           >
-            <View style={styles.actionIconContainer}>
-              <View style={[styles.actionIcon, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-                <Text style={styles.actionIconText}>👻</Text>
-              </View>
-            </View>
-            <Text style={styles.actionTitle}>Race a Ghost</Text>
-            <Text style={styles.actionSubtitle}>Chase your fastest self</Text>
+            <Text style={styles.primaryActionText}>Record an Activity</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.secondaryAction}
+            onPress={() => navigation.navigate('GhostSelect')}
+          >
+            <Text style={styles.secondaryActionText}>Race a Ghost</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>This Week</Text>
-          <View style={styles.statsRow}>
-            <View style={[styles.statCard, styles.statCardPrimary]}>
-              <Text style={styles.statValue}>
-                {summary.distanceKm.toFixed(1)}
-              </Text>
-              <Text style={styles.statLabel}>kilometers</Text>
-            </View>
-            <View style={[styles.statCard, styles.statCardSecondary]}>
-              <Text style={styles.statValue}>{summary.count}</Text>
-              <Text style={styles.statLabel}>runs</Text>
-            </View>
-            <View style={[styles.statCard, styles.statCardAccent]}>
-              <Text style={styles.statValue}>{summary.prs}</Text>
-              <Text style={styles.statLabel}>PRs</Text>
+          <Text style={styles.sectionTitle}>Suggested Challenges</Text>
+          <Text style={styles.sectionMetaText}>
+            Make accountability more fun and earn rewards.
+          </Text>
+          <View style={styles.challengeCard}>
+            <Text style={styles.challengeTitle}>December 5K Challenge</Text>
+            <Text style={styles.challengeMeta}>
+              Chase your best 5K run and claim a digital trophy.
+            </Text>
+            <View style={styles.challengeBadge}>
+              <Text style={styles.challengeBadgeText}>Digital Trophy</Text>
             </View>
           </View>
         </View>
 
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
+          <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>Recent Runs</Text>
-            <Text style={styles.sectionMeta}>
-              {isLoading ? 'Loading...' : `${runs.length} total`}
-            </Text>
+            <TouchableOpacity onPress={() => navigation.navigate('RunHistory')}>
+              <Text style={styles.sectionLink}>View all</Text>
+            </TouchableOpacity>
           </View>
           {recentRuns.length === 0 && !isLoading ? (
             <View style={styles.emptyCard}>
@@ -141,45 +174,18 @@ export default function HomeScreen({ navigation }) {
               </Text>
             </View>
           ) : (
-            recentRuns.map((run) => {
-              const runDate = new Date(run.timestamp ?? Date.now());
-              const distanceKm = run.distanceKm || (run.distance ?? 0) / 1000;
-              const durationMin = run.durationMin || (run.duration ?? 0) / 60;
-              const pace = distanceKm > 0 && durationMin > 0 
-                ? (durationMin / distanceKm).toFixed(2) 
-                : '0.00';
-              return (
-                <TouchableOpacity 
-                  key={run.id} 
-                  style={styles.runCard}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.runCardHeader}>
-                    <View style={styles.runDateContainer}>
-                      <Text style={styles.runDateDay}>
-                        {runDate.toLocaleDateString('en-US', { day: 'numeric' })}
-                      </Text>
-                      <Text style={styles.runDateMonth}>
-                        {runDate.toLocaleDateString('en-US', { month: 'short' })}
-                      </Text>
-                    </View>
-                    <View style={styles.runStatsContainer}>
-                      <Text style={styles.runTitle}>
-                        {distanceKm.toFixed(2)} km
-                      </Text>
-                      <Text style={styles.runMeta}>
-                        {Math.floor((run.duration ?? 0) / 60)}:{((run.duration ?? 0) % 60).toString().padStart(2, '0')} • {pace} min/km
-                      </Text>
-                    </View>
-                    {run.isGhostRun && (
-                      <View style={styles.ghostBadge}>
-                        <Text style={styles.ghostBadgeText}>👻</Text>
-                      </View>
-                    )}
-                  </View>
-                </TouchableOpacity>
-              );
-            })
+            recentRuns.map((run) => (
+              <View key={run.id} style={styles.runCard}>
+                <Text style={styles.runTitle}>
+                  {run.name?.trim() ||
+                    new Date(run.timestamp ?? Date.now()).toLocaleDateString()}
+                </Text>
+                <Text style={styles.runMeta}>
+                  {(run.distance / 1000).toFixed(2)} km •{' '}
+                  {Math.floor((run.duration ?? 0) / 60)} min
+                </Text>
+              </View>
+            ))
           )}
         </View>
       </ScrollView>
@@ -190,106 +196,52 @@ export default function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: theme.colors.ink,
-  },
-  background: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  orb: {
-    position: 'absolute',
-    borderRadius: 999,
-    opacity: 0.2,
-  },
-  orbOne: {
-    width: 260,
-    height: 260,
-    backgroundColor: theme.colors.secondary,
-    top: -80,
-    left: -40,
-  },
-  orbTwo: {
-    width: 320,
-    height: 320,
-    backgroundColor: theme.colors.primary,
-    bottom: -120,
-    right: -80,
-  },
-  orbThree: {
-    width: 180,
-    height: 180,
-    backgroundColor: theme.colors.accent,
-    top: 220,
-    right: -60,
+    backgroundColor: DARK_BG,
   },
   container: {
     padding: theme.spacing.lg,
-    paddingBottom: theme.spacing.xxl,
+    paddingBottom: theme.spacing.xl,
   },
   header: {
-    marginBottom: theme.spacing.xl,
-  },
-  kicker: {
-    color: theme.colors.accent,
-    fontSize: 12,
-    letterSpacing: 3,
-    textTransform: 'uppercase',
-    marginBottom: theme.spacing.xs,
-    fontWeight: '600',
-  },
-  title: {
-    color: theme.colors.mist,
-    ...theme.typography.h1,
-    marginBottom: theme.spacing.xs,
-  },
-  subtitle: {
-    color: theme.colors.mist,
-    opacity: 0.6,
-    fontSize: 16,
-    marginTop: theme.spacing.xs,
-  },
-  actions: {
-    marginBottom: theme.spacing.xl,
-  },
-  actionCard: {
-    borderRadius: theme.radius.xl,
-    padding: theme.spacing.lg,
-    marginBottom: theme.spacing.md,
-    ...theme.shadows.md,
-  },
-  primaryCard: {
-    backgroundColor: theme.colors.primary,
-  },
-  secondaryCard: {
-    backgroundColor: theme.colors.secondary,
-  },
-  actionIconContainer: {
-    marginBottom: theme.spacing.sm,
-  },
-  actionIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
+    flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: theme.spacing.lg,
   },
-  actionIconText: {
-    fontSize: 20,
-    color: theme.colors.ink,
+  headerLeft: {
+    flexDirection: 'row',
+    flex: 1,
   },
-  actionTitle: {
-    color: theme.colors.ink,
-    ...theme.typography.h3,
-    marginBottom: theme.spacing.xs,
+  headerRight: {
+    flex: 1,
+    alignItems: 'flex-end',
   },
-  actionSubtitle: {
-    color: theme.colors.ink,
-    opacity: 0.85,
-    fontSize: 14,
+  headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: '700',
+    color: theme.colors.mist,
+  },
+  iconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: CARD_BG,
+    marginRight: theme.spacing.sm,
+  },
+  iconText: {
+    color: theme.colors.mist,
+    fontWeight: '700',
+    fontSize: 12,
   },
   section: {
     marginBottom: theme.spacing.xl,
   },
-  sectionHeader: {
+  sectionHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -297,118 +249,151 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: theme.colors.mist,
-    ...theme.typography.h2,
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  sectionLink: {
+    color: PRIMARY_BLUE,
+    fontWeight: '600',
+  },
+  sectionMetaText: {
+    color: MUTED_TEXT,
     marginBottom: theme.spacing.md,
   },
-  sectionMeta: {
-    color: theme.colors.mist,
-    opacity: 0.6,
-    fontSize: 14,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: theme.spacing.sm,
-  },
-  statCard: {
-    flex: 1,
+  goalCard: {
+    backgroundColor: CARD_BG,
     borderRadius: theme.radius.lg,
-    padding: theme.spacing.md,
-    alignItems: 'center',
-    ...theme.shadows.sm,
-  },
-  statCardPrimary: {
-    backgroundColor: theme.colors.surfaceLight,
-    borderLeftWidth: 3,
-    borderLeftColor: theme.colors.primary,
-  },
-  statCardSecondary: {
-    backgroundColor: theme.colors.surfaceLight,
-    borderLeftWidth: 3,
-    borderLeftColor: theme.colors.secondary,
-  },
-  statCardAccent: {
-    backgroundColor: theme.colors.surfaceLight,
-    borderLeftWidth: 3,
-    borderLeftColor: theme.colors.accent,
-  },
-  statValue: {
-    color: theme.colors.mist,
-    fontSize: 24,
-    fontWeight: '800',
-    marginBottom: theme.spacing.xs,
-  },
-  statLabel: {
-    color: theme.colors.mist,
-    opacity: 0.7,
-    fontSize: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  runCard: {
-    backgroundColor: theme.colors.surfaceLight,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.md,
-    ...theme.shadows.sm,
-  },
-  runCardHeader: {
+    padding: theme.spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
   },
-  runDateContainer: {
-    width: 60,
-    alignItems: 'center',
+  goalIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#1E2A3C',
     marginRight: theme.spacing.md,
-    paddingRight: theme.spacing.md,
-    borderRightWidth: 1,
-    borderRightColor: theme.colors.slate,
   },
-  runDateDay: {
-    color: theme.colors.mist,
-    fontSize: 24,
-    fontWeight: '800',
-    lineHeight: 28,
-  },
-  runDateMonth: {
-    color: theme.colors.mist,
-    opacity: 0.6,
-    fontSize: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  runStatsContainer: {
+  goalContent: {
     flex: 1,
   },
-  runTitle: {
+  goalTitle: {
     color: theme.colors.mist,
     fontSize: 18,
     fontWeight: '700',
-    marginBottom: theme.spacing.xs,
   },
-  runMeta: {
+  goalMeta: {
+    color: MUTED_TEXT,
+    marginTop: 4,
+  },
+  goalProgress: {
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: CARD_BORDER,
+    marginTop: theme.spacing.sm,
+    overflow: 'hidden',
+  },
+  goalProgressFill: {
+    height: '100%',
+    backgroundColor: PRIMARY_BLUE,
+  },
+  goalButton: {
+    backgroundColor: PRIMARY_BLUE,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: 12,
+    marginLeft: theme.spacing.md,
+  },
+  goalButtonText: {
+    color: 'white',
+    fontWeight: '700',
+  },
+  readyTitle: {
     color: theme.colors.mist,
-    opacity: 0.7,
-    fontSize: 14,
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: theme.spacing.sm,
   },
-  ghostBadge: {
-    marginLeft: theme.spacing.sm,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: theme.colors.accent,
-    justifyContent: 'center',
+  readyMeta: {
+    color: MUTED_TEXT,
+    marginBottom: theme.spacing.md,
+  },
+  primaryAction: {
+    backgroundColor: PRIMARY_BLUE,
+    borderRadius: theme.radius.lg,
+    paddingVertical: theme.spacing.md,
     alignItems: 'center',
+    marginBottom: theme.spacing.sm,
   },
-  ghostBadgeText: {
+  primaryActionText: {
+    color: 'white',
+    fontWeight: '700',
     fontSize: 16,
   },
-  emptyCard: {
-    backgroundColor: '#1B222A',
+  secondaryAction: {
+    backgroundColor: CARD_BG,
+    borderRadius: theme.radius.lg,
+    paddingVertical: theme.spacing.md,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+  },
+  secondaryActionText: {
+    color: theme.colors.mist,
+    fontWeight: '600',
+  },
+  challengeCard: {
+    backgroundColor: CARD_BG,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.lg,
+  },
+  challengeTitle: {
+    color: theme.colors.mist,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  challengeMeta: {
+    color: MUTED_TEXT,
+    marginTop: 6,
+  },
+  challengeBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#1C2B4D',
+    borderRadius: 10,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 4,
+    marginTop: theme.spacing.sm,
+  },
+  challengeBadgeText: {
+    color: '#A9C4FF',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  runCard: {
+    backgroundColor: CARD_BG,
     borderRadius: theme.radius.md,
     padding: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+  },
+  runTitle: {
+    color: theme.colors.mist,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  runMeta: {
+    color: MUTED_TEXT,
+    marginTop: 4,
+  },
+  emptyCard: {
+    backgroundColor: CARD_BG,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
   },
   emptyText: {
-    color: theme.colors.mist,
-    opacity: 0.7,
+    color: MUTED_TEXT,
   },
 });
