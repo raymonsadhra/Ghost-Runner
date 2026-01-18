@@ -6,6 +6,10 @@ The app now uses the following structure:
   - Each user document has: `userId`, `createdAt`, `totalRuns`, `totalDistance`, `lastRunAt`
   - **Runs** subcollection: Contains all runs for that user
     - Each run document has: `points`, `distance`, `distanceKm`, `duration`, `durationMin`, `pace`, `timestamp`, `createdAt`, `ghostMeta`, `isGhostRun`
+  - **Friends** subcollection: Accepted friends for that user
+    - Each friend document has: `userId`, `displayName`, `createdAt`, `status`
+  - **FriendRequests** subcollection: Pending friend requests
+    - Each request document has: `userId`, `displayName`, `email`, `direction`, `status`, `createdAt`
 
 ## Problem
 You're seeing the error: "Missing or insufficient permissions"
@@ -62,6 +66,44 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == userId;
       match /Runs/{runId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+      match /Friends/{friendId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+      match /FriendRequests/{requestId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+  }
+}
+```
+
+#### Option D: Auth + Friends Requests + Public User Lookup (Recommended for Friends)
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /Users/{userId} {
+      // Allow read of user profiles for friend search / leaderboard.
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+
+      match /Runs/{runId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      match /Friends/{friendId} {
+        // Either user can create/delete the friendship record.
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow create, delete: if request.auth != null &&
+          (request.auth.uid == userId || request.auth.uid == friendId);
+      }
+
+      match /FriendRequests/{requestId} {
+        // Owner can read their requests. Sender (requestId) can create/delete on receiver.
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow create, delete: if request.auth != null &&
+          (request.auth.uid == userId || request.auth.uid == requestId);
       }
     }
   }

@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { theme } from '../theme';
+import { fetchFriends } from '../services/friendService';
 import OutsiderBackground from '../components/OutsiderBackground';
 
 const CARD_BG = theme.colors.surfaceElevated;
@@ -26,17 +27,22 @@ export default function LeaderboardScreen({ navigation }) {
       const loadLeaderboard = async () => {
         setIsLoading(true);
         try {
-          // TODO: Implement leaderboard data fetching from Firebase
-          // For now, using mock data
-          const mockData = [
-            { id: '1', name: 'Runner 1', distance: 15.2, runs: 5, rank: 1 },
-            { id: '2', name: 'Runner 2', distance: 12.8, runs: 4, rank: 2 },
-            { id: '3', name: 'Runner 3', distance: 10.5, runs: 3, rank: 3 },
-            { id: '4', name: 'Runner 4', distance: 9.1, runs: 3, rank: 4 },
-            { id: '5', name: 'Runner 5', distance: 8.3, runs: 2, rank: 5 },
-          ];
+          const friends = await fetchFriends();
+          const leaderboardData = friends
+            .map((friend) => ({
+              id: friend.id,
+              userId: friend.id,
+              name: friend.displayName ?? friend.name ?? 'Runner',
+              distance: (friend.totalDistance ?? 0) / 1000,
+              runs: friend.totalRuns ?? 0,
+            }))
+            .sort((a, b) => b.distance - a.distance)
+            .map((entry, index) => ({
+              ...entry,
+              rank: index + 1,
+            }));
           if (active) {
-            setLeaderboard(mockData);
+            setLeaderboard(leaderboardData);
           }
         } catch (error) {
           if (active) {

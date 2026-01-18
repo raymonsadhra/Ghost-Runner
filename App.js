@@ -40,13 +40,18 @@ function LoginScreen() {
     try {
       const userRef = doc(db, 'Users', userId);
       const userSnap = await getDoc(userRef);
+      const baseName = (userName || 'Runner').trim() || 'Runner';
+      const baseNameLower = baseName.toLowerCase();
+      const emailLower = userEmail ? userEmail.toLowerCase() : null;
       
       if (!userSnap.exists()) {
         // Create user document in Firestore
         const userData = {
           userId,
-          name: userName || 'Runner',
-          displayName: userName || 'Runner',
+          name: baseName,
+          displayName: baseName,
+          nameLower: baseNameLower,
+          displayNameLower: baseNameLower,
           createdAt: serverTimestamp(),
           totalRuns: 0,
           totalDistance: 0,
@@ -56,6 +61,7 @@ function LoginScreen() {
         // Only add email if provided (not for anonymous users)
         if (userEmail) {
           userData.email = userEmail;
+          userData.emailLower = emailLower;
         }
         
         await setDoc(userRef, userData);
@@ -66,12 +72,22 @@ function LoginScreen() {
         const updates = {};
         
         if (!userData.name || !userData.displayName) {
-          updates.name = userName || userData.name || 'Runner';
-          updates.displayName = userName || userData.displayName || 'Runner';
+          updates.name = baseName || userData.name || 'Runner';
+          updates.displayName = baseName || userData.displayName || 'Runner';
         }
         
         if (userEmail && !userData.email) {
           updates.email = userEmail;
+        }
+
+        if (!userData.nameLower) {
+          updates.nameLower = (userData.name || baseName).toLowerCase();
+        }
+        if (!userData.displayNameLower) {
+          updates.displayNameLower = (userData.displayName || baseName).toLowerCase();
+        }
+        if (userEmail && !userData.emailLower) {
+          updates.emailLower = emailLower;
         }
         
         if (Object.keys(updates).length > 0) {
@@ -493,6 +509,12 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       setUser(u);
       setLoading(false);
+      // Clear any cached data when user changes
+      if (u) {
+        console.log('User signed in:', u.uid);
+      } else {
+        console.log('User signed out');
+      }
     });
     return unsubscribe;
   }, []);
@@ -505,6 +527,7 @@ export default function App() {
         <StatusBar barStyle="light-content" />
         {user ? (
           <Tab.Navigator
+            key={user.uid} // Force remount when user changes
             screenOptions={{
               headerShown: false,
               tabBarActiveTintColor: theme.colors.primary,
@@ -515,10 +538,26 @@ export default function App() {
               },
             }}
           >
-            <Tab.Screen name="HomeTab" component={HomeStack} options={{ headerShown: false }} />
-            <Tab.Screen name="LeaderboardTab" component={LeaderboardStack} options={{ headerShown: false }} />
-            <Tab.Screen name="FriendsTab" component={FriendsStack} options={{ headerShown: false }} />
-            <Tab.Screen name="ProfileTab" component={ProfileStack} options={{ headerShown: false }} />
+            <Tab.Screen 
+              name="HomeTab" 
+              component={HomeStack} 
+              options={{ headerShown: false }}
+            />
+            <Tab.Screen 
+              name="LeaderboardTab" 
+              component={LeaderboardStack} 
+              options={{ headerShown: false }}
+            />
+            <Tab.Screen 
+              name="FriendsTab" 
+              component={FriendsStack} 
+              options={{ headerShown: false }}
+            />
+            <Tab.Screen 
+              name="ProfileTab" 
+              component={ProfileStack} 
+              options={{ headerShown: false }}
+            />
           </Tab.Navigator>
         ) : (
           <LoginScreen />

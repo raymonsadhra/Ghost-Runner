@@ -11,6 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { theme } from '../theme';
 import { getUserRuns } from '../services/firebaseService';
+import { auth } from '../firebase';
 import { DEFAULT_WEEKLY_GOAL_KM, loadWeeklyGoal, saveWeeklyGoal } from '../services/goalService';
 import OutsiderBackground from '../components/OutsiderBackground';
 
@@ -46,6 +47,7 @@ export default function HomeScreen({ navigation }) {
           setIsLoading(true);
         }
         try {
+          // getUserRuns() will automatically use auth.currentUser.uid
           const data = await getUserRuns();
           if (active) {
             setRuns(data);
@@ -70,7 +72,7 @@ export default function HomeScreen({ navigation }) {
         active = false;
         clearInterval(intervalId);
       };
-    }, [])
+    }, [auth?.currentUser?.uid])
   );
 
   useEffect(() => {
