@@ -30,30 +30,40 @@ export default function SummaryScreen({ navigation, route }) {
 
   return (
     <View style={styles.container}>
-      <MapView style={styles.map} initialRegion={getInitialRegion(routePoints)}>
+      <MapView 
+        style={styles.map} 
+        initialRegion={getInitialRegion(routePoints)}
+        mapType="standard"
+      >
         <Polyline
           coordinates={routePoints}
           strokeColor={theme.colors.secondary}
-          strokeWidth={4}
+          strokeWidth={5}
         />
       </MapView>
       <View style={styles.panel}>
-        <Text style={styles.title}>Run Complete</Text>
+        <View style={styles.header}>
+          <Text style={styles.title}>Run Complete!</Text>
+          <Text style={styles.subtitle}>Great job out there</Text>
+        </View>
+        
         <View style={styles.statsRow}>
-          <View style={styles.statCard}>
+          <View style={[styles.statCard, styles.statCardPrimary]}>
             <Text style={styles.statValue}>{(distance / 1000).toFixed(2)}</Text>
-            <Text style={styles.statLabel}>km</Text>
+            <Text style={styles.statLabel}>Distance</Text>
+            <Text style={styles.statUnit}>km</Text>
           </View>
-          <View style={styles.statCard}>
+          <View style={[styles.statCard, styles.statCardSecondary]}>
             <Text style={styles.statValue}>
-              {Math.floor(duration / 60)}:
-              {(duration % 60).toString().padStart(2, '0')}
+              {Math.floor(duration / 60)}:{(duration % 60).toString().padStart(2, '0')}
             </Text>
-            <Text style={styles.statLabel}>time</Text>
+            <Text style={styles.statLabel}>Time</Text>
+            <Text style={styles.statUnit}>min:sec</Text>
           </View>
-          <View style={styles.statCard}>
+          <View style={[styles.statCard, styles.statCardAccent]}>
             <Text style={styles.statValue}>{pace.toFixed(2)}</Text>
-            <Text style={styles.statLabel}>min/km</Text>
+            <Text style={styles.statLabel}>Pace</Text>
+            <Text style={styles.statUnit}>min/km</Text>
           </View>
         </View>
 
@@ -64,13 +74,15 @@ export default function SummaryScreen({ navigation, route }) {
               ghostRoute: routePoints,
             })
           }
+          activeOpacity={0.8}
         >
-          <Text style={styles.primaryText}>Race This Ghost</Text>
+          <Text style={styles.primaryText}>Race This Ghost 👻</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.secondaryButton}
           onPress={() => navigation.navigate('Home')}
+          activeOpacity={0.8}
         >
           <Text style={styles.secondaryText}>Back to Home</Text>
         </TouchableOpacity>
@@ -92,56 +104,92 @@ const styles = StyleSheet.create({
     left: theme.spacing.lg,
     right: theme.spacing.lg,
     bottom: theme.spacing.lg,
-    backgroundColor: 'rgba(15, 20, 27, 0.92)',
-    borderRadius: theme.radius.lg,
+    backgroundColor: 'rgba(15, 20, 27, 0.95)',
+    borderRadius: theme.radius.xl,
     padding: theme.spacing.lg,
+    ...theme.shadows.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.slate,
+  },
+  header: {
+    marginBottom: theme.spacing.lg,
+    alignItems: 'center',
   },
   title: {
     color: theme.colors.mist,
-    fontSize: 24,
-    fontWeight: '700',
-    marginBottom: theme.spacing.md,
+    ...theme.typography.h2,
+    marginBottom: theme.spacing.xs,
+  },
+  subtitle: {
+    color: theme.colors.mist,
+    opacity: 0.6,
+    fontSize: 14,
   },
   statsRow: {
     flexDirection: 'row',
     marginBottom: theme.spacing.lg,
+    gap: theme.spacing.sm,
   },
   statCard: {
     flex: 1,
-    backgroundColor: '#1D242C',
-    borderRadius: theme.radius.md,
-    padding: theme.spacing.sm,
+    backgroundColor: theme.colors.surfaceLight,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.md,
     alignItems: 'center',
-    marginRight: theme.spacing.sm,
+    ...theme.shadows.sm,
+  },
+  statCardPrimary: {
+    borderTopWidth: 3,
+    borderTopColor: theme.colors.primary,
+  },
+  statCardSecondary: {
+    borderTopWidth: 3,
+    borderTopColor: theme.colors.secondary,
+  },
+  statCardAccent: {
+    borderTopWidth: 3,
+    borderTopColor: theme.colors.accent,
   },
   statValue: {
     color: theme.colors.mist,
-    fontWeight: '700',
-    fontSize: 18,
+    fontWeight: '800',
+    fontSize: 22,
+    marginBottom: theme.spacing.xs,
   },
   statLabel: {
     color: theme.colors.mist,
-    opacity: 0.6,
-    marginTop: 4,
+    opacity: 0.7,
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: theme.spacing.xs,
+  },
+  statUnit: {
+    color: theme.colors.mist,
+    opacity: 0.5,
+    fontSize: 10,
   },
   primaryButton: {
     backgroundColor: theme.colors.primary,
-    borderRadius: theme.radius.lg,
+    borderRadius: theme.radius.xl,
     paddingVertical: theme.spacing.md,
     alignItems: 'center',
     marginBottom: theme.spacing.sm,
+    ...theme.shadows.md,
   },
   primaryText: {
     color: theme.colors.ink,
     fontWeight: '800',
     fontSize: 16,
+    letterSpacing: 0.5,
   },
   secondaryButton: {
     borderColor: theme.colors.mist,
-    borderWidth: 1,
-    borderRadius: theme.radius.lg,
+    borderWidth: 1.5,
+    borderRadius: theme.radius.xl,
     paddingVertical: theme.spacing.md,
     alignItems: 'center',
+    backgroundColor: 'transparent',
   },
   secondaryText: {
     color: theme.colors.mist,

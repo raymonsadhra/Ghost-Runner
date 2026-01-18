@@ -117,17 +117,25 @@ export default function RunScreen({ navigation }) {
       </MapView>
 
       <View style={styles.stats}>
-        <Text style={styles.statText}>{(distance / 1000).toFixed(2)} km</Text>
-        <Text style={styles.statText}>
-          {Math.floor(duration / 60)}:
-          {(duration % 60).toString().padStart(2, '0')}
-        </Text>
+        <View style={styles.statItem}>
+          <Text style={styles.statLabel}>Distance</Text>
+          <Text style={styles.statValue}>{(distance / 1000).toFixed(2)}</Text>
+          <Text style={styles.statUnit}>km</Text>
+        </View>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
+          <Text style={styles.statLabel}>Time</Text>
+          <Text style={styles.statValue}>
+            {Math.floor(duration / 60)}:{(duration % 60).toString().padStart(2, '0')}
+          </Text>
+        </View>
       </View>
 
       <TouchableOpacity
         style={[styles.button, isRunning ? styles.stopButton : styles.startButton]}
         onPress={isRunning ? stopRun : startRun}
         disabled={isSaving}
+        activeOpacity={0.8}
       >
         <Text style={styles.buttonText}>
           {isSaving ? 'SAVING...' : isRunning ? 'STOP' : 'START'}
@@ -149,26 +157,54 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 70,
     alignSelf: 'center',
-    backgroundColor: 'rgba(15, 20, 27, 0.8)',
+    backgroundColor: 'rgba(15, 20, 27, 0.95)',
     paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.sm,
-    borderRadius: theme.radius.lg,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.radius.xl,
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    minWidth: 220,
+    alignItems: 'center',
+    minWidth: 280,
+    ...theme.shadows.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.slate,
   },
-  statText: {
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statLabel: {
     color: theme.colors.mist,
-    fontSize: 20,
-    fontWeight: '700',
+    opacity: 0.7,
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: theme.spacing.xs,
+  },
+  statValue: {
+    color: theme.colors.mist,
+    fontSize: 24,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  statUnit: {
+    color: theme.colors.mist,
+    opacity: 0.6,
+    fontSize: 12,
+  },
+  statDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: theme.colors.slate,
+    marginHorizontal: theme.spacing.md,
   },
   button: {
     position: 'absolute',
-    bottom: 40,
+    bottom: 50,
     alignSelf: 'center',
-    paddingHorizontal: 60,
-    paddingVertical: 18,
+    paddingHorizontal: 80,
+    paddingVertical: 20,
     borderRadius: 999,
+    ...theme.shadows.lg,
   },
   startButton: {
     backgroundColor: theme.colors.primary,
@@ -180,6 +216,6 @@ const styles = StyleSheet.create({
     color: theme.colors.ink,
     fontSize: 18,
     fontWeight: '800',
-    letterSpacing: 1,
+    letterSpacing: 2,
   },
 });

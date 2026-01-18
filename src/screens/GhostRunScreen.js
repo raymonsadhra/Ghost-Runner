@@ -6,6 +6,7 @@ import { LocationTracker } from '../services/LocationTracker';
 import { GhostRacer } from '../services/GhostRacer';
 import { AudioManager } from '../services/AudioManager';
 import { calculateTotalDistance } from '../utils/geoUtils';
+import { saveRun } from '../services/firebaseService';
 import { theme } from '../theme';
 import { audioSources } from '../config/audioSources';
 
@@ -46,6 +47,7 @@ export default function GhostRunScreen({ navigation, route }) {
   const [duration, setDuration] = useState(0);
   const [distance, setDistance] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const ghostActive = duration >= GHOST_HEAD_START_MS / 1000;
 
   const handlePoint = useCallback((point, allPoints) => {
@@ -118,14 +120,33 @@ export default function GhostRunScreen({ navigation, route }) {
     return () => clearInterval(interval);
   }, [isRunning]);
 
-  const stopRun = () => {
+  const stopRun = async () => {
     trackerRef.current.stop();
     audioManagerRef.current.stopAll();
     setIsRunning(false);
+    setIsSaving(true);
+
+    const routePoints = userPointsRef.current;
+    const routeDistance = calculateTotalDistance(routePoints);
+    const payload = {
+      points: routePoints,
+      distance: routeDistance,
+      duration,
+      timestamp: Date.now(),
+      ghostMeta: route.params?.ghostMeta ?? null,
+    };
+
+    try {
+      await saveRun(payload);
+    } catch (error) {
+      // Swallow for now; summary will still render locally.
+    } finally {
+      setIsSaving(false);
+    }
 
     navigation.navigate('Summary', {
-      routePoints: userPointsRef.current,
-      distance,
+      routePoints: routePoints,
+      distance: routeDistance,
       duration,
       ghostMeta: route.params?.ghostMeta ?? null,
     });
@@ -160,30 +181,47 @@ export default function GhostRunScreen({ navigation, route }) {
       </MapView>
 
       <View style={styles.hud}>
-        <View style={styles.hudRow}>
-          <Text style={styles.hudLabel}>Time</Text>
-          <Text style={styles.hudValue}>
-            {Math.floor(duration / 60)}:
-            {(duration % 60).toString().padStart(2, '0')}
-          </Text>
+        <View style={styles.hudHeader}>
+          <Text style={styles.hudTitle}>Ghost Race</Text>
+          {ghostActive && (
+            <View style={styles.ghostActiveBadge}>
+              <Text style={styles.ghostActiveText}>👻 Active</Text>
+            </View>
+          )}
         </View>
-        <View style={styles.hudRow}>
-          <Text style={styles.hudLabel}>Distance</Text>
-          <Text style={styles.hudValue}>{(distance / 1000).toFixed(2)} km</Text>
+        <View style={styles.hudStats}>
+          <View style={styles.hudStatItem}>
+            <Text style={styles.hudStatLabel}>Time</Text>
+            <Text style={styles.hudStatValue}>
+              {Math.floor(duration / 60)}:{(duration % 60).toString().padStart(2, '0')}
+            </Text>
+          </View>
+          <View style={styles.hudStatDivider} />
+          <View style={styles.hudStatItem}>
+            <Text style={styles.hudStatLabel}>Distance</Text>
+            <Text style={styles.hudStatValue}>{(distance / 1000).toFixed(2)}</Text>
+            <Text style={styles.hudStatUnit}>km</Text>
+          </View>
         </View>
-        <View style={styles.deltaChip}>
-          <Text style={styles.deltaText}>
-            {delta >= 0 ? 'Ahead' : 'Behind'} {Math.abs(delta).toFixed(1)} m
-          </Text>
-        </View>
+        {ghostActive && (
+          <View style={[styles.deltaChip, delta >= 0 ? styles.deltaChipAhead : styles.deltaChipBehind]}>
+            <Text style={styles.deltaIcon}>{delta >= 0 ? '↑' : '↓'}</Text>
+            <Text style={styles.deltaText}>
+              {delta >= 0 ? 'Ahead' : 'Behind'} {Math.abs(delta).toFixed(1)}m
+            </Text>
+          </View>
+        )}
       </View>
 
       <TouchableOpacity
         style={styles.stopButton}
         onPress={stopRun}
-        disabled={!isRunning}
+        disabled={!isRunning || isSaving}
+        activeOpacity={0.8}
       >
-        <Text style={styles.stopText}>STOP</Text>
+        <Text style={styles.stopText}>
+          {isSaving ? 'SAVING...' : 'STOP'}
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -201,57 +239,121 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 60,
     alignSelf: 'center',
-    backgroundColor: 'rgba(15, 20, 27, 0.85)',
-    padding: theme.spacing.md,
-    borderRadius: theme.radius.lg,
-    minWidth: 220,
+    backgroundColor: 'rgba(15, 20, 27, 0.95)',
+    padding: theme.spacing.lg,
+    borderRadius: theme.radius.xl,
+    minWidth: 300,
+    ...theme.shadows.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.slate,
   },
-  hudRow: {
+  hudHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: theme.spacing.xs,
+    alignItems: 'center',
+    marginBottom: theme.spacing.md,
+    paddingBottom: theme.spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.slate,
   },
-  hudLabel: {
+  hudTitle: {
+    color: theme.colors.mist,
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  ghostActiveBadge: {
+    backgroundColor: theme.colors.accent,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 4,
+    borderRadius: theme.radius.sm,
+  },
+  ghostActiveText: {
+    color: theme.colors.ink,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  hudStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: theme.spacing.sm,
+  },
+  hudStatItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  hudStatLabel: {
     color: theme.colors.mist,
     opacity: 0.7,
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: theme.spacing.xs,
   },
-  hudValue: {
+  hudStatValue: {
     color: theme.colors.mist,
-    fontWeight: '700',
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  hudStatUnit: {
+    color: theme.colors.mist,
+    opacity: 0.6,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  hudStatDivider: {
+    width: 1,
+    height: 50,
+    backgroundColor: theme.colors.slate,
+    marginHorizontal: theme.spacing.md,
   },
   deltaChip: {
     marginTop: theme.spacing.sm,
-    backgroundColor: theme.colors.primary,
-    borderRadius: theme.radius.md,
-    paddingVertical: 6,
+    borderRadius: theme.radius.lg,
+    paddingVertical: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
-    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.xs,
+  },
+  deltaChipAhead: {
+    backgroundColor: theme.colors.secondary,
+  },
+  deltaChipBehind: {
+    backgroundColor: theme.colors.danger,
+  },
+  deltaIcon: {
+    fontSize: 16,
+    color: theme.colors.ink,
   },
   deltaText: {
     color: theme.colors.ink,
     fontWeight: '700',
+    fontSize: 14,
   },
   stopButton: {
     position: 'absolute',
-    bottom: 40,
+    bottom: 50,
     alignSelf: 'center',
-    paddingHorizontal: 60,
-    paddingVertical: 18,
+    paddingHorizontal: 80,
+    paddingVertical: 20,
     borderRadius: 999,
     backgroundColor: theme.colors.danger,
+    ...theme.shadows.lg,
   },
   stopText: {
     color: theme.colors.ink,
     fontWeight: '800',
     fontSize: 18,
-    letterSpacing: 1,
+    letterSpacing: 2,
   },
   ghostMarker: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: 'rgba(233, 242, 244, 0.7)',
-    borderWidth: 2,
-    borderColor: 'rgba(233, 242, 244, 0.9)',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 209, 102, 0.9)',
+    borderWidth: 3,
+    borderColor: theme.colors.accent,
+    ...theme.shadows.md,
   },
 });
