@@ -496,6 +496,14 @@ function FriendsStack() {
       }}
     >
       <Stack.Screen name="Friends" component={FriendsScreen} options={{ headerShown: false }} />
+      <Stack.Screen
+        name="UserRunHistory"
+        component={UserRunHistoryScreen}
+        options={({ route }) => ({
+          title: `${route.params?.userName ?? 'Runner'}'s Runs`,
+          headerShown: true,
+        })}
+      />
     </Stack.Navigator>
   );
 }

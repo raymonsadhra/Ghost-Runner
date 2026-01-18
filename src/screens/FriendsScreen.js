@@ -283,8 +283,10 @@ export default function FriendsScreen({ navigation }) {
                 key={friend.id}
                 style={styles.friendCard}
                 onPress={() => {
-                  // TODO: Navigate to friend's profile
-                  console.log('View friend:', friend.id);
+                  navigation.navigate('UserRunHistory', {
+                    userId: friend.id,
+                    userName: friend.displayName ?? friend.name ?? 'Runner',
+                  });
                 }}
               >
                 <View style={styles.friendInfo}>
