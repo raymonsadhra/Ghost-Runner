@@ -17,18 +17,27 @@ const DEFAULT_PROFILE = {
 export async function loadProfile() {
   try {
     const raw = await AsyncStorage.getItem(LOCAL_PROFILE_KEY);
-    if (!raw) return { ...DEFAULT_PROFILE };
+    if (!raw) {
+      const initial = { ...DEFAULT_PROFILE, createdAt: Date.now() };
+      await AsyncStorage.setItem(LOCAL_PROFILE_KEY, JSON.stringify(initial));
+      return initial;
+    }
     const parsed = JSON.parse(raw);
-    return {
+    const payload = {
       ...DEFAULT_PROFILE,
       ...parsed,
+      createdAt: parsed?.createdAt ?? Date.now(),
       outfit: {
         ...DEFAULT_PROFILE.outfit,
         ...(parsed?.outfit ?? {}),
       },
     };
+    if (!parsed?.createdAt) {
+      await AsyncStorage.setItem(LOCAL_PROFILE_KEY, JSON.stringify(payload));
+    }
+    return payload;
   } catch (error) {
-    return { ...DEFAULT_PROFILE };
+    return { ...DEFAULT_PROFILE, createdAt: Date.now() };
   }
 }
 

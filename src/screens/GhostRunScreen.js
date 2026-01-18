@@ -21,6 +21,8 @@ const GHOST_HEAD_START_MS = 8000;
 const PRIMARY_BLUE = theme.colors.neonBlue;
 const CARD_BORDER = 'rgba(255, 255, 255, 0.12)';
 const MUTED_TEXT = theme.colors.textMuted;
+const MILESTONE_FIRST_MILE_METERS = 1609.34;
+const MILESTONE_STEP_MILES = 5;
 const MAP_STYLE = [
   { elementType: 'geometry', stylers: [{ color: '#0B0A0E' }] },
   { elementType: 'labels.text.fill', stylers: [{ color: '#C9C4DA' }] },
@@ -103,6 +105,8 @@ export default function GhostRunScreen({ navigation, route }) {
   const userPointsRef = useRef([]);
   const powerUpsRef = useRef([]);
   const powerUpEffectsRef = useRef({ freezeUntil: 0, slowUntil: 0 });
+  const nextMilestoneRef = useRef(MILESTONE_FIRST_MILE_METERS);
+  const milestoneTimeoutRef = useRef(null);
 
   const [userPoints, setUserPoints] = useState([]);
   const [ghostPosition, setGhostPosition] = useState(null);
@@ -114,6 +118,7 @@ export default function GhostRunScreen({ navigation, route }) {
   const [bossPhase, setBossPhase] = useState(1);
   const [powerUps, setPowerUps] = useState([]);
   const [activePowerUp, setActivePowerUp] = useState(null);
+  const [milestoneToast, setMilestoneToast] = useState(null);
   const ghostActive = duration >= GHOST_HEAD_START_MS / 1000;
 
   useEffect(() => {
@@ -153,11 +158,24 @@ export default function GhostRunScreen({ navigation, route }) {
     const nextPoints = [...allPoints];
     userPointsRef.current = nextPoints;
     setUserPoints(nextPoints);
-    setDistance(calculateTotalDistance(nextPoints));
+    const nextDistance = calculateTotalDistance(nextPoints);
+    setDistance(nextDistance);
 
     const nearby = pickPowerUpInRange(point, powerUpsRef.current);
     if (nearby) {
       applyPowerUp(nearby);
+    }
+
+    if (nextDistance >= nextMilestoneRef.current) {
+      const nextMiles = nextMilestoneRef.current / 1609.34;
+      setMilestoneToast(`${nextMiles.toFixed(0)} mile milestone reached!`);
+      if (milestoneTimeoutRef.current) {
+        clearTimeout(milestoneTimeoutRef.current);
+      }
+      milestoneTimeoutRef.current = setTimeout(() => {
+        setMilestoneToast(null);
+      }, 3500);
+      nextMilestoneRef.current += MILESTONE_STEP_MILES * 1609.34;
     }
   }, [applyPowerUp]);
 
@@ -193,6 +211,9 @@ export default function GhostRunScreen({ navigation, route }) {
       trackerRef.current.stop();
       audioManagerRef.current.stopAll();
       audioManagerRef.current.unload();
+      if (milestoneTimeoutRef.current) {
+        clearTimeout(milestoneTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -449,6 +470,11 @@ export default function GhostRunScreen({ navigation, route }) {
             </Text>
           </View>
         )}
+        {milestoneToast && (
+          <View style={styles.milestoneChip}>
+            <Text style={styles.milestoneText}>{milestoneToast}</Text>
+          </View>
+        )}
       </View>
 
       <TouchableOpacity
@@ -608,6 +634,20 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   powerUpText: {
+    color: theme.colors.text,
+    fontWeight: '700',
+  },
+  milestoneChip: {
+    marginTop: theme.spacing.sm,
+    backgroundColor: 'rgba(255, 90, 175, 0.2)',
+    borderRadius: theme.radius.md,
+    paddingVertical: 8,
+    paddingHorizontal: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 90, 175, 0.45)',
+    alignSelf: 'flex-start',
+  },
+  milestoneText: {
     color: theme.colors.text,
     fontWeight: '700',
   },

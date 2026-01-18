@@ -23,6 +23,9 @@ import OutsiderBackground from '../components/OutsiderBackground';
 const CARD_BG = theme.colors.surfaceElevated;
 const CARD_BORDER = 'rgba(255, 255, 255, 0.08)';
 const MUTED_TEXT = theme.colors.textMuted;
+const METERS_PER_MILE = 1609.34;
+const MILESTONE_STEP_MILES = 25;
+const BASE_MILESTONE_MILES = 100;
 
 function formatBadgeLabel(badgeId) {
   if (!badgeId) return 'Unknown';
@@ -38,6 +41,18 @@ function getWeekStart(timestamp) {
   date.setDate(date.getDate() - day);
   date.setHours(0, 0, 0, 0);
   return date.getTime();
+}
+
+function getRunDistanceMeters(run) {
+  if (!run) return 0;
+  if (typeof run.distance === 'number') return run.distance;
+  if (typeof run.distanceKm === 'number') return run.distanceKm * 1000;
+  return 0;
+}
+
+function formatDateLabel(timestamp) {
+  if (!timestamp) return 'Unknown';
+  return new Date(timestamp).toLocaleDateString();
 }
 
 export default function ProfileScreen() {
@@ -58,7 +73,7 @@ export default function ProfileScreen() {
         const [rewards, loadedProfile, loadedRuns] = await Promise.all([
           loadRewards(),
           loadProfile(),
-          getUserRuns(undefined, { max: 5 }),
+          getUserRuns(undefined, { max: 200 }),
         ]);
         if (!active) return;
         setXp(rewards.xp ?? 0);
@@ -91,6 +106,34 @@ export default function ProfileScreen() {
       distanceKm: distance / 1000,
       durationMin: Math.floor(duration / 60),
       count: weekRuns.length,
+    };
+  }, [runs]);
+
+  const insights = useMemo(() => {
+    const totalMeters = runs.reduce(
+      (sum, run) => sum + getRunDistanceMeters(run),
+      0
+    );
+    const totalMiles = totalMeters / METERS_PER_MILE;
+    const completedCount = Math.floor(totalMiles / MILESTONE_STEP_MILES);
+    const nextMilestoneMiles = (completedCount + 1) * MILESTONE_STEP_MILES;
+    const lastMilestoneMiles = Math.max(
+      BASE_MILESTONE_MILES,
+      completedCount * MILESTONE_STEP_MILES
+    );
+    const milestones = [];
+    for (
+      let miles = MILESTONE_STEP_MILES;
+      miles <= lastMilestoneMiles;
+      miles += MILESTONE_STEP_MILES
+    ) {
+      milestones.push({ miles, achieved: totalMiles >= miles });
+    }
+    const recentMilestones = milestones.slice(Math.max(0, milestones.length - 4));
+    return {
+      totalMiles,
+      nextMilestoneMiles,
+      recentMilestones,
     };
   }, [runs]);
 
@@ -230,6 +273,50 @@ export default function ProfileScreen() {
               <Text style={styles.weekValue}>{weekSummary.count}</Text>
               <Text style={styles.weekLabel}>runs</Text>
             </View>
+          </View>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Insights</Text>
+          <View style={styles.insightRow}>
+            <View style={styles.insightItem}>
+              <Text style={styles.insightLabel}>Joined</Text>
+              <Text style={styles.insightValue}>
+                {formatDateLabel(profile?.createdAt)}
+              </Text>
+            </View>
+            <View style={styles.insightItem}>
+              <Text style={styles.insightLabel}>Total miles</Text>
+              <Text style={styles.insightValue}>{insights.totalMiles.toFixed(1)}</Text>
+            </View>
+          </View>
+          <View style={styles.insightRow}>
+            <View style={styles.insightItem}>
+              <Text style={styles.insightLabel}>Next milestone</Text>
+              <Text style={styles.insightValue}>
+                {insights.nextMilestoneMiles} mi
+              </Text>
+            </View>
+          </View>
+          <View style={styles.milestoneRow}>
+            {insights.recentMilestones.map((milestone) => (
+              <View
+                key={milestone.miles}
+                style={[
+                  styles.milestoneChip,
+                  milestone.achieved && styles.milestoneChipActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.milestoneText,
+                    milestone.achieved && styles.milestoneTextActive,
+                  ]}
+                >
+                  {milestone.miles} mi
+                </Text>
+              </View>
+            ))}
           </View>
         </View>
 
@@ -496,6 +583,49 @@ const styles = StyleSheet.create({
   weekLabel: {
     color: MUTED_TEXT,
     marginTop: 4,
+  },
+  insightRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: theme.spacing.sm,
+  },
+  insightItem: {
+    flex: 1,
+  },
+  insightLabel: {
+    color: MUTED_TEXT,
+    marginBottom: 4,
+  },
+  insightValue: {
+    color: theme.colors.text,
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  milestoneRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: theme.spacing.xs,
+  },
+  milestoneChip: {
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+    borderRadius: 999,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 6,
+    marginRight: theme.spacing.sm,
+    marginBottom: theme.spacing.sm,
+    backgroundColor: 'rgba(11, 10, 14, 0.7)',
+  },
+  milestoneChipActive: {
+    borderColor: theme.colors.neonPink,
+    backgroundColor: 'rgba(255, 90, 175, 0.15)',
+  },
+  milestoneText: {
+    color: MUTED_TEXT,
+    fontWeight: '600',
+  },
+  milestoneTextActive: {
+    color: theme.colors.text,
   },
   section: {
     marginBottom: theme.spacing.lg,
