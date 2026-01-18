@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { deleteRun, getUserRuns } from '../services/firebaseService';
 import {
   createBossGhostIfEligible,
@@ -20,40 +21,44 @@ export default function GhostSelectScreen({ navigation }) {
   const [bossGhosts, setBossGhosts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    let active = true;
-    const loadRuns = async () => {
-      try {
-        const [runsData, bossData] = await Promise.all([
-          getUserRuns(),
-          getBossGhosts(),
-        ]);
-        let nextBossData = bossData;
-        if (bossData.length === 0 && runsData.length >= 5) {
-          await createBossGhostIfEligible();
-          nextBossData = await getBossGhosts();
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      const loadRuns = async () => {
+        setIsLoading(true);
+        try {
+          const [runsData, bossData] = await Promise.all([
+            getUserRuns(),
+            getBossGhosts(),
+          ]);
+          let nextBossData = bossData;
+          if (bossData.length === 0 && runsData.length >= 5) {
+            await createBossGhostIfEligible();
+            nextBossData = await getBossGhosts();
+          }
+          if (active) {
+            setRuns(runsData);
+            setBossGhosts(nextBossData);
+          }
+        } catch (error) {
+          console.error('Error loading runs:', error);
+          if (active) {
+            setRuns([]);
+            setBossGhosts([]);
+          }
+        } finally {
+          if (active) {
+            setIsLoading(false);
+          }
         }
-        if (active) {
-          setRuns(runsData);
-          setBossGhosts(nextBossData);
-        }
-      } catch (error) {
-        if (active) {
-          setRuns([]);
-          setBossGhosts([]);
-        }
-      } finally {
-        if (active) {
-          setIsLoading(false);
-        }
-      }
-    };
+      };
 
-    loadRuns();
-    return () => {
-      active = false;
-    };
-  }, []);
+      loadRuns();
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
 
   const handleDelete = (item) => {
     Alert.alert(
@@ -87,9 +92,10 @@ export default function GhostSelectScreen({ navigation }) {
   };
 
   const renderRun = ({ item }) => {
-    const distanceKm = (item.distance ?? 0) / 1000;
-    const durationMin = Math.floor((item.duration ?? 0) / 60);
-    const pace = distanceKm > 0 ? (item.duration / 60) / distanceKm : 0;
+    // Use Firebase fields if available, otherwise calculate
+    const distanceKm = item.distanceKm || (item.distance ?? 0) / 1000;
+    const durationMin = item.durationMin || Math.floor((item.duration ?? 0) / 60);
+    const pace = item.pace || (distanceKm > 0 && durationMin > 0 ? (durationMin / distanceKm).toFixed(2) : 0);
     const isBoss = item.type === 'boss';
     const bossPalette = item.character?.palette;
     const bossAccent = bossPalette?.primary ?? theme.colors.primary;
@@ -105,7 +111,7 @@ export default function GhostSelectScreen({ navigation }) {
         ]}
         onPress={() =>
           navigation.navigate('GhostRun', {
-            ghostRoute: item.route ?? item.points,
+            ghostRoute: item.route ?? item.points ?? [],
             ghostMeta: item,
           })
         }
@@ -136,7 +142,7 @@ export default function GhostSelectScreen({ navigation }) {
           {distanceKm.toFixed(2)} km • {durationMin} min
         </Text>
         <Text style={styles.cardMeta}>
-          Pace {pace.toFixed(2)} min/km
+          Pace {typeof pace === 'number' ? pace.toFixed(2) : pace} min/km
         </Text>
         {isBoss && (
           <Text style={[styles.bossMeta, { color: bossAccent }]}>

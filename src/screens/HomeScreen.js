@@ -60,7 +60,11 @@ export default function HomeScreen({ navigation }) {
   const summary = useMemo(() => {
     const weekStart = getWeekStart(Date.now());
     const weekRuns = runs.filter((run) => (run.timestamp ?? 0) >= weekStart);
-    const distance = weekRuns.reduce((sum, run) => sum + (run.distance ?? 0), 0);
+    const distance = weekRuns.reduce((sum, run) => {
+      // Use distanceKm if available, otherwise convert distance from meters
+      const runDistance = run.distanceKm ? run.distanceKm * 1000 : (run.distance ?? 0);
+      return sum + runDistance;
+    }, 0);
     return {
       distanceKm: distance / 1000,
       count: weekRuns.length,
@@ -89,7 +93,17 @@ export default function HomeScreen({ navigation }) {
           <View style={styles.headerRight}>
             <TouchableOpacity
               style={styles.iconButton}
-              onPress={() => navigation.navigate('Profile')}
+              onPress={() => {
+                // Navigate to Profile tab
+                try {
+                  const parent = navigation.getParent();
+                  if (parent) {
+                    parent.navigate('ProfileTab');
+                  }
+                } catch (error) {
+                  console.warn('Navigation error:', error);
+                }
+              }}
             >
               <Text style={styles.iconText}>Me</Text>
             </TouchableOpacity>
@@ -174,18 +188,22 @@ export default function HomeScreen({ navigation }) {
               </Text>
             </View>
           ) : (
-            recentRuns.map((run) => (
-              <View key={run.id} style={styles.runCard}>
-                <Text style={styles.runTitle}>
-                  {run.name?.trim() ||
-                    new Date(run.timestamp ?? Date.now()).toLocaleDateString()}
-                </Text>
-                <Text style={styles.runMeta}>
-                  {(run.distance / 1000).toFixed(2)} km •{' '}
-                  {Math.floor((run.duration ?? 0) / 60)} min
-                </Text>
-              </View>
-            ))
+            recentRuns.map((run) => {
+              const distanceKm = run.distanceKm || (run.distance ?? 0) / 1000;
+              const durationMin = run.durationMin || Math.floor((run.duration ?? 0) / 60);
+              const pace = run.pace || (distanceKm > 0 && durationMin > 0 ? (durationMin / distanceKm).toFixed(2) : '0.00');
+              return (
+                <View key={run.id} style={styles.runCard}>
+                  <Text style={styles.runTitle}>
+                    {run.name?.trim() ||
+                      new Date(run.timestamp ?? Date.now()).toLocaleDateString()}
+                  </Text>
+                  <Text style={styles.runMeta}>
+                    {distanceKm.toFixed(2)} km • {durationMin} min • {pace} min/km
+                  </Text>
+                </View>
+              );
+            })
           )}
         </View>
       </ScrollView>

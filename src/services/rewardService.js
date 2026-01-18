@@ -41,6 +41,7 @@ async function saveRewards(next) {
 }
 
 function unique(list) {
+  if (!Array.isArray(list)) return [];
   return Array.from(new Set(list.filter(Boolean)));
 }
 
@@ -50,17 +51,18 @@ export async function awardRunXp({
   userId = getUserId(),
   xp = 50,
 } = {}) {
-  const existing = await loadRewards();
-  const runKeys = unique([runId, localId]);
-  const hasAwarded = runKeys.some((key) => existing.runXpRuns.includes(key));
+  const existing = normalizeRewards(await loadRewards());
+  const runKeys = unique([runId, localId].filter(Boolean));
+  const runXpRuns = Array.isArray(existing?.runXpRuns) ? existing.runXpRuns : [];
+  const hasAwarded = runKeys.length > 0 && runXpRuns && Array.isArray(runXpRuns) && runKeys.some((key) => runXpRuns.includes(key));
   if (hasAwarded) {
     return { ...existing, awarded: false };
   }
 
   const next = {
     ...existing,
-    xp: existing.xp + xp,
-    runXpRuns: unique([...existing.runXpRuns, ...runKeys]),
+    xp: (existing.xp || 0) + xp,
+    runXpRuns: unique([...runXpRuns, ...runKeys]),
   };
 
   const saved = await saveRewards(next);
@@ -93,16 +95,19 @@ export async function awardBossRewards({
   badgeId = 'boss_slayer',
   unlocks = ['boss_theme'],
 } = {}) {
-  const existing = await loadRewards();
-  if (bossId && existing.bossWins.includes(bossId)) {
+  const existing = normalizeRewards(await loadRewards());
+  const bossWins = Array.isArray(existing?.bossWins) ? existing.bossWins : [];
+  const existingBadges = Array.isArray(existing?.badges) ? existing.badges : [];
+  const existingUnlocks = Array.isArray(existing?.unlocks) ? existing.unlocks : [];
+  if (bossId && bossWins && Array.isArray(bossWins) && bossWins.includes(bossId)) {
     return { ...existing, awarded: false };
   }
 
   const next = {
-    xp: existing.xp + xp,
-    badges: unique([...existing.badges, badgeId]),
-    unlocks: unique([...existing.unlocks, ...unlocks]),
-    bossWins: unique([...existing.bossWins, bossId]),
+    xp: (existing.xp || 0) + xp,
+    badges: unique([...existingBadges, badgeId]),
+    unlocks: unique([...existingUnlocks, ...unlocks]),
+    bossWins: unique([...bossWins, bossId]),
   };
 
   const saved = await saveRewards(next);

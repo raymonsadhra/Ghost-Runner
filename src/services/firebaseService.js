@@ -9,6 +9,7 @@ import {
   doc,
   setDoc,
   getDoc,
+  updateDoc,
   serverTimestamp,
 } from 'firebase/firestore';
 import { db, auth } from '../firebase';
@@ -83,6 +84,7 @@ export async function saveRun(runData, { timeoutMs = 2500 } = {}) {
     createdAt: serverTimestamp(),
     ghostMeta: runData.ghostMeta || null,
     isGhostRun: !!runData.ghostMeta,
+    name: runData.name || null, // run name
   };
 
   try {
@@ -181,6 +183,44 @@ export async function getUserRuns(userId = getUserId(), { max = 20 } = {}) {
         console.error('Fallback query also failed:', fallbackError);
         throw fallbackError;
       }
+    }
+    throw error;
+  }
+}
+
+export async function updateRunName(runId, name, { localId = null, localOnly = false } = {}) {
+  if (!hasFirebaseConfig()) {
+    throw new Error('Firebase is not configured. Cannot update run name.');
+  }
+
+  const userId = getUserId();
+  const trimmedName = name?.trim() || null;
+
+  // If it's a local-only run, we can't update it in Firebase
+  if (localOnly && !runId) {
+    console.log('Run is local-only, skipping Firebase update');
+    return { success: true, localOnly: true };
+  }
+
+  try {
+    // Update in Firebase if we have a runId
+    if (runId) {
+      const runRef = doc(db, 'Users', userId, 'Runs', runId);
+      await updateDoc(runRef, {
+        name: trimmedName,
+        updatedAt: serverTimestamp(),
+      });
+      console.log(`Updated run name in Firebase: ${runId}`);
+    }
+
+    // Note: If you have local storage, you might want to update it here too
+    // For now, we're only updating Firebase since local storage was removed
+
+    return { success: true, id: runId };
+  } catch (error) {
+    console.error('Error updating run name:', error);
+    if (error.code === 'permission-denied' || error.message?.includes('permission')) {
+      throw new Error('Firestore permission denied. Cannot update run name.');
     }
     throw error;
   }
