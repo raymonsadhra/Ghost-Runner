@@ -9,6 +9,7 @@ import { calculateTotalDistance } from '../utils/geoUtils';
 import { generatePowerUps, pickPowerUpInRange } from '../services/powerUpService';
 import { theme } from '../theme';
 import { audioSources } from '../config/audioSources';
+import OutsiderBackground from '../components/OutsiderBackground';
 
 const DEFAULT_REGION = {
   latitude: 37.7749,
@@ -17,18 +18,17 @@ const DEFAULT_REGION = {
   longitudeDelta: 0.01,
 };
 const GHOST_HEAD_START_MS = 8000;
-const PRIMARY_BLUE = '#2F6BFF';
-const CARD_BG = '#121A2A';
-const CARD_BORDER = '#1E2A3C';
-const MUTED_TEXT = '#8FA4BF';
+const PRIMARY_BLUE = theme.colors.neonBlue;
+const CARD_BORDER = 'rgba(255, 255, 255, 0.12)';
+const MUTED_TEXT = theme.colors.textMuted;
 const MAP_STYLE = [
-  { elementType: 'geometry', stylers: [{ color: '#0B0F17' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#8FA4BF' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#0B0F17' }] },
-  { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#111827' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0B2239' }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#101826' }] },
-  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#1B2A40' }] },
+  { elementType: 'geometry', stylers: [{ color: '#0B0A0E' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#C9C4DA' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#0B0A0E' }] },
+  { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#14111B' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0A1A21' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#14111C' }] },
+  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#1F1B2A' }] },
 ];
 const DEFAULT_BOSS_PHASES = [
   { threshold: 0.5, multiplier: 1.08 },
@@ -317,7 +317,8 @@ export default function GhostRunScreen({ navigation, route }) {
   };
 
   return (
-    <View style={styles.container}>
+    <OutsiderBackground accent="purple">
+      <View style={styles.container}>
       <MapView
         style={styles.map}
         showsUserLocation
@@ -336,13 +337,13 @@ export default function GhostRunScreen({ navigation, route }) {
         )}
         <Polyline
           coordinates={userPoints}
-          strokeColor="rgba(47, 107, 255, 0.25)"
+          strokeColor="rgba(255, 45, 122, 0.25)"
           strokeWidth={8}
           lineCap="round"
         />
         <Polyline
           coordinates={userPoints}
-          strokeColor={PRIMARY_BLUE}
+          strokeColor={theme.colors.neonPink}
           strokeWidth={4}
           lineCap="round"
         />
@@ -454,26 +455,28 @@ export default function GhostRunScreen({ navigation, route }) {
         style={styles.stopButton}
         onPress={stopRun}
         disabled={!isRunning}
+        activeOpacity={0.85}
       >
         <Text style={styles.stopText}>STOP</Text>
       </TouchableOpacity>
-    </View>
+      </View>
+    </OutsiderBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.ink,
+    backgroundColor: 'transparent',
   },
   map: {
     flex: 1,
   },
   hud: {
     position: 'absolute',
-    top: 60,
+    top: 18,
     alignSelf: 'center',
-    backgroundColor: CARD_BG,
+    backgroundColor: 'rgba(21, 19, 28, 0.88)',
     padding: theme.spacing.md,
     borderRadius: theme.radius.lg,
     minWidth: 280,
@@ -481,12 +484,12 @@ const styles = StyleSheet.create({
     borderColor: CARD_BORDER,
   },
   bossHud: {
-    backgroundColor: 'rgba(47, 107, 255, 0.12)',
+    backgroundColor: 'rgba(124, 92, 255, 0.18)',
     borderRadius: theme.radius.md,
     padding: theme.spacing.sm,
     marginBottom: theme.spacing.sm,
     borderWidth: 1,
-    borderColor: 'rgba(47, 107, 255, 0.4)',
+    borderColor: 'rgba(124, 92, 255, 0.45)',
   },
   bossHeader: {
     flexDirection: 'row',
@@ -495,11 +498,11 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.xs,
   },
   bossTitle: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontWeight: '700',
   },
   bossPhase: {
-    color: theme.colors.mist,
+    color: theme.colors.textMuted,
     opacity: 0.8,
     fontSize: 12,
   },
@@ -514,7 +517,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.primary,
   },
   bossMeta: {
-    color: theme.colors.mist,
+    color: theme.colors.textMuted,
     opacity: 0.75,
     marginTop: theme.spacing.xs,
     fontSize: 12,
@@ -533,24 +536,24 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   hudValue: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontWeight: '700',
   },
   deltaChip: {
     marginTop: theme.spacing.sm,
-    backgroundColor: PRIMARY_BLUE,
+    backgroundColor: theme.colors.neonPink,
     borderRadius: theme.radius.md,
     paddingVertical: 6,
     paddingHorizontal: theme.spacing.md,
     alignSelf: 'flex-start',
   },
   deltaText: {
-    color: 'white',
+    color: theme.colors.text,
     fontWeight: '700',
   },
   stopButton: {
     position: 'absolute',
-    bottom: 40,
+    bottom: 36,
     alignSelf: 'center',
     paddingHorizontal: 60,
     paddingVertical: 18,
@@ -558,7 +561,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.danger,
   },
   stopText: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontWeight: '800',
     fontSize: 18,
     letterSpacing: 1,
@@ -567,9 +570,9 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: 'rgba(47, 107, 255, 0.9)',
+    backgroundColor: 'rgba(85, 215, 255, 0.9)',
     borderWidth: 2,
-    borderColor: 'rgba(233, 242, 244, 0.9)',
+    borderColor: 'rgba(245, 242, 255, 0.9)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -580,11 +583,11 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: 'rgba(15, 20, 27, 0.85)',
+    backgroundColor: 'rgba(21, 19, 28, 0.85)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(233, 242, 244, 0.4)',
+    borderColor: 'rgba(245, 242, 255, 0.4)',
   },
   powerUpCore: {
     width: 18,
@@ -598,14 +601,14 @@ const styles = StyleSheet.create({
   },
   powerUpChip: {
     marginTop: theme.spacing.sm,
-    backgroundColor: theme.colors.secondary,
+    backgroundColor: theme.colors.neonPurple,
     borderRadius: theme.radius.md,
     paddingVertical: 6,
     paddingHorizontal: theme.spacing.md,
     alignSelf: 'flex-start',
   },
   powerUpText: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontWeight: '700',
   },
 });

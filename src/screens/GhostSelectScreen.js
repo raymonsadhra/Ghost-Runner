@@ -15,6 +15,7 @@ import {
   getBossGhosts,
 } from '../services/bossGhostService';
 import { theme } from '../theme';
+import OutsiderBackground from '../components/OutsiderBackground';
 
 export default function GhostSelectScreen({ navigation }) {
   const [runs, setRuns] = useState([]);
@@ -164,45 +165,46 @@ export default function GhostSelectScreen({ navigation }) {
   const ghostOptions = [...bossGhosts, ...runs];
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Choose Your Ghost</Text>
-      {isLoading ? (
-        <Text style={styles.loading}>Loading runs...</Text>
-      ) : (
-        <FlatList
-          data={ghostOptions}
-          renderItem={renderRun}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.list}
-          ListEmptyComponent={
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyText}>
-                No runs yet. Record a run to create your first ghost.
-              </Text>
-            </View>
-          }
-        />
-      )}
-    </View>
+    <OutsiderBackground accent="purple">
+      <View style={styles.container}>
+        <Text style={styles.title}>Choose Your Ghost</Text>
+        {isLoading ? (
+          <Text style={styles.loading}>Loading runs...</Text>
+        ) : (
+          <FlatList
+            data={ghostOptions}
+            renderItem={renderRun}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.list}
+            ListEmptyComponent={
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyText}>
+                  No runs yet. Record a run to create your first ghost.
+                </Text>
+              </View>
+            }
+          />
+        )}
+      </View>
+    </OutsiderBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.ink,
+    backgroundColor: 'transparent',
     paddingTop: theme.spacing.lg,
   },
   title: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontSize: 26,
     fontWeight: '700',
     paddingHorizontal: theme.spacing.lg,
     marginBottom: theme.spacing.md,
   },
   loading: {
-    color: theme.colors.mist,
-    opacity: 0.7,
+    color: theme.colors.textMuted,
     paddingHorizontal: theme.spacing.lg,
   },
   list: {
@@ -210,16 +212,16 @@ const styles = StyleSheet.create({
     paddingBottom: theme.spacing.xl,
   },
   card: {
-    backgroundColor: '#121A2A',
+    backgroundColor: theme.colors.surfaceElevated,
     borderRadius: theme.radius.lg,
     padding: theme.spacing.lg,
     marginBottom: theme.spacing.md,
     borderWidth: 1,
-    borderColor: '#1E2A3C',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   bossCard: {
     borderWidth: 1,
-    borderColor: 'rgba(47, 107, 255, 0.6)',
+    borderColor: 'rgba(124, 92, 255, 0.6)',
   },
   cardHeader: {
     flexDirection: 'row',
@@ -228,13 +230,13 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.sm,
   },
   cardTitle: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontSize: 18,
     fontWeight: '700',
   },
   cardBadge: {
-    color: theme.colors.mist,
-    backgroundColor: theme.colors.accent,
+    color: theme.colors.text,
+    backgroundColor: theme.colors.neonPurple,
     paddingHorizontal: theme.spacing.sm,
     paddingVertical: 4,
     borderRadius: theme.radius.sm,
@@ -242,15 +244,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   bossBadge: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: theme.colors.neonPink,
   },
   cardMeta: {
-    color: theme.colors.mist,
-    opacity: 0.7,
+    color: theme.colors.textMuted,
     marginTop: 4,
   },
   bossMeta: {
-    color: theme.colors.accent,
+    color: theme.colors.neonBlue,
     marginTop: theme.spacing.sm,
     fontWeight: '600',
   },
@@ -266,18 +267,17 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.danger,
   },
   actionText: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontWeight: '700',
   },
   emptyCard: {
-    backgroundColor: '#121A2A',
+    backgroundColor: theme.colors.surfaceElevated,
     borderRadius: theme.radius.lg,
     padding: theme.spacing.lg,
     borderWidth: 1,
-    borderColor: '#1E2A3C',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   emptyText: {
-    color: theme.colors.mist,
-    opacity: 0.7,
+    color: theme.colors.textMuted,
   },
 });

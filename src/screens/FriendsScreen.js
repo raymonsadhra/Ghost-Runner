@@ -10,12 +10,11 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { theme } from '../theme';
+import OutsiderBackground from '../components/OutsiderBackground';
 
-const PRIMARY_BLUE = '#2F6BFF';
-const DARK_BG = '#0B0F17';
-const CARD_BG = '#121A2A';
-const CARD_BORDER = '#1E2A3C';
-const MUTED_TEXT = '#8FA4BF';
+const CARD_BG = theme.colors.surfaceElevated;
+const CARD_BORDER = 'rgba(255, 255, 255, 0.08)';
+const MUTED_TEXT = theme.colors.textMuted;
 
 export default function FriendsScreen({ navigation }) {
   const [friends, setFriends] = useState([]);
@@ -79,12 +78,13 @@ export default function FriendsScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Friends</Text>
-      </View>
+    <OutsiderBackground accent="blue">
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Friends</Text>
+        </View>
 
-      <ScrollView contentContainerStyle={styles.container}>
+        <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Add Friend</Text>
           <View style={styles.searchContainer}>
@@ -193,15 +193,16 @@ export default function FriendsScreen({ navigation }) {
             ))
           )}
         </View>
-      </ScrollView>
-    </SafeAreaView>
+        </ScrollView>
+      </SafeAreaView>
+    </OutsiderBackground>
   );
 }
 
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: DARK_BG,
+    backgroundColor: 'transparent',
   },
   header: {
     paddingHorizontal: theme.spacing.lg,
@@ -211,7 +212,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 28,
     fontWeight: '700',
-    color: theme.colors.mist,
+    color: theme.colors.text,
   },
   container: {
     padding: theme.spacing.lg,
@@ -220,7 +221,7 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.xl,
   },
   sectionTitle: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontSize: 20,
     fontWeight: '700',
     marginBottom: theme.spacing.md,
@@ -237,17 +238,17 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.sm,
-    color: theme.colors.mist,
+    color: theme.colors.text,
   },
   searchButton: {
-    backgroundColor: PRIMARY_BLUE,
+    backgroundColor: theme.colors.neonPink,
     borderRadius: theme.radius.md,
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.sm,
     justifyContent: 'center',
   },
   searchButtonText: {
-    color: 'white',
+    color: theme.colors.text,
     fontWeight: '700',
   },
   requestCard: {
@@ -268,12 +269,12 @@ const styles = StyleSheet.create({
     marginLeft: theme.spacing.md,
   },
   requestName: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontSize: 16,
     fontWeight: '600',
   },
   requestMeta: {
-    color: MUTED_TEXT,
+    color: theme.colors.textMuted,
     fontSize: 12,
     marginTop: 2,
   },
@@ -288,7 +289,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   acceptButton: {
-    backgroundColor: PRIMARY_BLUE,
+    backgroundColor: theme.colors.neonGreen,
   },
   declineButton: {
     backgroundColor: CARD_BG,
@@ -296,8 +297,8 @@ const styles = StyleSheet.create({
     borderColor: CARD_BORDER,
   },
   requestButtonText: {
-    color: 'white',
-    fontWeight: '600',
+    color: theme.colors.text,
+    fontWeight: '700',
     fontSize: 14,
   },
   friendCard: {
@@ -319,7 +320,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: PRIMARY_BLUE,
+    backgroundColor: theme.colors.neonPurple,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: theme.spacing.md,
@@ -338,7 +339,7 @@ const styles = StyleSheet.create({
     gap: theme.spacing.sm,
   },
   friendName: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -348,18 +349,18 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   statusActive: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: theme.colors.neonGreen,
   },
   statusAway: {
-    backgroundColor: MUTED_TEXT,
+    backgroundColor: theme.colors.textMuted,
   },
   friendMeta: {
-    color: MUTED_TEXT,
+    color: theme.colors.textMuted,
     fontSize: 12,
     marginTop: 2,
   },
   chevron: {
-    color: MUTED_TEXT,
+    color: theme.colors.textMuted,
     fontSize: 24,
     fontWeight: '300',
   },
@@ -372,7 +373,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyText: {
-    color: MUTED_TEXT,
+    color: theme.colors.textMuted,
     textAlign: 'center',
   },
 });

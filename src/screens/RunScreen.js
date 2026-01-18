@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import MapView, { Polyline } from 'react-native-maps';
 
 import { LocationTracker } from '../services/LocationTracker';
@@ -8,19 +9,20 @@ import { saveRun } from '../services/firebaseService';
 import { createBossGhostIfEligible } from '../services/bossGhostService';
 import { awardRunXp } from '../services/rewardService';
 import { theme } from '../theme';
+import OutsiderBackground from '../components/OutsiderBackground';
 
-const PRIMARY_BLUE = '#2F6BFF';
-const CARD_BG = '#121A2A';
-const CARD_BORDER = '#1E2A3C';
-const MUTED_TEXT = '#8FA4BF';
+const ROUTE_COLOR = theme.colors.neonPink;
+const ROUTE_GLOW = 'rgba(255, 45, 122, 0.25)';
+const CARD_BORDER = 'rgba(255, 255, 255, 0.1)';
+const MUTED_TEXT = theme.colors.textMuted;
 const MAP_STYLE = [
-  { elementType: 'geometry', stylers: [{ color: '#0B0F17' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#8FA4BF' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#0B0F17' }] },
-  { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#111827' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0B2239' }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#101826' }] },
-  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#1B2A40' }] },
+  { elementType: 'geometry', stylers: [{ color: '#0B0A0E' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#C9C4DA' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#0B0A0E' }] },
+  { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#14111B' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0A1A21' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#14111C' }] },
+  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#1F1B2A' }] },
 ];
 
 const DEFAULT_REGION = {
@@ -137,74 +139,90 @@ export default function RunScreen({ navigation }) {
   };
 
   return (
-    <View style={styles.container}>
-      <MapView
-        style={styles.map}
-        showsUserLocation
-        followsUserLocation
-        initialRegion={getInitialRegion(points)}
-        customMapStyle={MAP_STYLE}
-      >
-        <Polyline
-          coordinates={points}
-          strokeColor="rgba(47, 107, 255, 0.25)"
-          strokeWidth={8}
-          lineCap="round"
-        />
-        <Polyline
-          coordinates={points}
-          strokeColor={PRIMARY_BLUE}
-          strokeWidth={4}
-          lineCap="round"
-        />
-      </MapView>
+    <OutsiderBackground accent="blue">
+      <View style={styles.container}>
+        <MapView
+          style={styles.map}
+          showsUserLocation
+          followsUserLocation
+          initialRegion={getInitialRegion(points)}
+          customMapStyle={MAP_STYLE}
+        >
+          <Polyline
+            coordinates={points}
+            strokeColor={ROUTE_GLOW}
+            strokeWidth={8}
+            lineCap="round"
+          />
+          <Polyline
+            coordinates={points}
+            strokeColor={ROUTE_COLOR}
+            strokeWidth={4}
+            lineCap="round"
+          />
+        </MapView>
 
-      <View style={styles.stats}>
-        <View style={styles.statBlock}>
-          <Text style={styles.statLabel}>Distance</Text>
-          <Text style={styles.statValue}>{(distance / 1000).toFixed(2)} km</Text>
+        <View style={styles.stats}>
+          <View style={styles.statBlock}>
+            <Text style={styles.statLabel}>Distance</Text>
+            <Text style={styles.statValue}>{(distance / 1000).toFixed(2)} km</Text>
+          </View>
+          <View style={styles.statBlock}>
+            <Text style={styles.statLabel}>Time</Text>
+            <Text style={styles.statValue}>
+              {Math.floor(duration / 60)}:
+              {(duration % 60).toString().padStart(2, '0')}
+            </Text>
+          </View>
+          <View style={styles.statBlock}>
+            <Text style={styles.statLabel}>Pace</Text>
+            <Text style={styles.statValue}>
+              {pace > 0 ? pace.toFixed(2) : '0.00'} /km
+            </Text>
+          </View>
         </View>
-        <View style={styles.statBlock}>
-          <Text style={styles.statLabel}>Time</Text>
-          <Text style={styles.statValue}>
-            {Math.floor(duration / 60)}:
-            {(duration % 60).toString().padStart(2, '0')}
-          </Text>
-        </View>
-        <View style={styles.statBlock}>
-          <Text style={styles.statLabel}>Pace</Text>
-          <Text style={styles.statValue}>
-            {pace > 0 ? pace.toFixed(2) : '0.00'} /km
-          </Text>
-        </View>
+
+        <TouchableOpacity
+          style={[styles.button, isRunning && styles.stopButton]}
+          onPress={isRunning ? stopRun : startRun}
+          disabled={isSaving}
+          activeOpacity={0.85}
+        >
+          {isRunning ? (
+            <View style={styles.stopButtonInner}>
+              <Text style={styles.buttonText}>
+                {isSaving ? 'SAVING...' : 'STOP'}
+              </Text>
+            </View>
+          ) : (
+            <LinearGradient
+              colors={[theme.colors.neonPink, theme.colors.neonPurple]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.startButton}
+            >
+              <Text style={styles.buttonText}>START</Text>
+            </LinearGradient>
+          )}
+        </TouchableOpacity>
       </View>
-
-      <TouchableOpacity
-        style={[styles.button, isRunning ? styles.stopButton : styles.startButton]}
-        onPress={isRunning ? stopRun : startRun}
-        disabled={isSaving}
-      >
-        <Text style={styles.buttonText}>
-          {isSaving ? 'SAVING...' : isRunning ? 'STOP' : 'START'}
-        </Text>
-      </TouchableOpacity>
-    </View>
+    </OutsiderBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.ink,
+    backgroundColor: 'transparent',
   },
   map: {
     flex: 1,
   },
   stats: {
     position: 'absolute',
-    top: 70,
+    top: 18,
     alignSelf: 'center',
-    backgroundColor: CARD_BG,
+    backgroundColor: 'rgba(21, 19, 28, 0.88)',
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.md,
     borderRadius: theme.radius.lg,
@@ -223,26 +241,32 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   statValue: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontSize: 16,
     fontWeight: '700',
   },
   button: {
     position: 'absolute',
-    bottom: 40,
+    bottom: 36,
     alignSelf: 'center',
-    paddingHorizontal: 60,
-    paddingVertical: 18,
-    borderRadius: 999,
+    borderRadius: theme.radius.pill,
+    overflow: 'hidden',
   },
   startButton: {
-    backgroundColor: PRIMARY_BLUE,
+    paddingHorizontal: 60,
+    paddingVertical: 18,
+    alignItems: 'center',
   },
   stopButton: {
     backgroundColor: theme.colors.danger,
   },
+  stopButtonInner: {
+    paddingHorizontal: 60,
+    paddingVertical: 18,
+    alignItems: 'center',
+  },
   buttonText: {
-    color: 'white',
+    color: theme.colors.text,
     fontSize: 18,
     fontWeight: '800',
     letterSpacing: 1,

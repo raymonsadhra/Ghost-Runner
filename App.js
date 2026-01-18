@@ -125,11 +125,11 @@ const styles = StyleSheet.create({
   },
   pillOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(11, 15, 23, 0.35)',
+    backgroundColor: 'rgba(11, 10, 14, 0.45)',
     borderRadius: 28,
   },
   pillAndroid: {
-    backgroundColor: 'rgba(18, 26, 42, 0.92)',
+    backgroundColor: 'rgba(21, 19, 28, 0.92)',
   },
   pillInner: {
     flexDirection: 'row',
@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
   },
   activeSegment: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(47, 107, 255, 0.35)',
+    backgroundColor: 'rgba(255, 45, 122, 0.25)',
     borderRadius: 16,
   },
   tabContent: {
@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
   tabLabel: {
     fontSize: 10,
     fontWeight: '600',
-    color: 'rgba(232, 240, 255, 0.65)',
+    color: 'rgba(245, 242, 255, 0.65)',
     letterSpacing: 0.2,
   },
   tabLabelActive: {

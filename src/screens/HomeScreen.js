@@ -7,15 +7,16 @@ import {
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { theme } from '../theme';
 import { getUserRuns } from '../services/firebaseService';
+import OutsiderBackground from '../components/OutsiderBackground';
 
-const PRIMARY_BLUE = '#2F6BFF';
-const DARK_BG = '#0B0F17';
-const CARD_BG = '#121A2A';
-const CARD_BORDER = '#1E2A3C';
-const MUTED_TEXT = '#8FA4BF';
+const CARD_BG = theme.colors.surfaceElevated;
+const CARD_BORDER = 'rgba(255, 255, 255, 0.08)';
+const MUTED_TEXT = theme.colors.textMuted;
+const SOFT_TEXT = theme.colors.textSoft;
 
 function getWeekStart(timestamp) {
   const date = new Date(timestamp);
@@ -78,8 +79,9 @@ export default function HomeScreen({ navigation }) {
   const progressPercent = goalKm > 0 ? progressKm / goalKm : 0;
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.container}>
+    <OutsiderBackground accent="purple">
+      <SafeAreaView style={styles.safe}>
+        <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <TouchableOpacity style={styles.iconButton}>
@@ -147,8 +149,16 @@ export default function HomeScreen({ navigation }) {
           <TouchableOpacity
             style={styles.primaryAction}
             onPress={() => navigation.navigate('Run')}
+            activeOpacity={0.85}
           >
-            <Text style={styles.primaryActionText}>Record an Activity</Text>
+            <LinearGradient
+              colors={[theme.colors.neonPink, theme.colors.neonPurple]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.primaryActionInner}
+            >
+              <Text style={styles.primaryActionText}>Record an Activity</Text>
+            </LinearGradient>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.secondaryAction}
@@ -206,19 +216,20 @@ export default function HomeScreen({ navigation }) {
             })
           )}
         </View>
-      </ScrollView>
-    </SafeAreaView>
+        </ScrollView>
+      </SafeAreaView>
+    </OutsiderBackground>
   );
 }
 
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: DARK_BG,
+    backgroundColor: 'transparent',
   },
   container: {
     padding: theme.spacing.lg,
-    paddingBottom: theme.spacing.xl,
+    paddingBottom: theme.spacing.xxl,
   },
   header: {
     flexDirection: 'row',
@@ -236,25 +247,27 @@ const styles = StyleSheet.create({
   headerTitle: {
     flex: 1,
     textAlign: 'center',
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
-    color: theme.colors.mist,
+    color: theme.colors.text,
+    letterSpacing: 0.6,
   },
   iconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     borderWidth: 1,
-    borderColor: CARD_BORDER,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: CARD_BG,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
     marginRight: theme.spacing.sm,
   },
   iconText: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontWeight: '700',
     fontSize: 12,
+    letterSpacing: 0.4,
   },
   section: {
     marginBottom: theme.spacing.xl,
@@ -266,16 +279,16 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
   },
   sectionTitle: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontSize: 20,
     fontWeight: '700',
   },
   sectionLink: {
-    color: PRIMARY_BLUE,
-    fontWeight: '600',
+    color: theme.colors.neonBlue,
+    fontWeight: '700',
   },
   sectionMetaText: {
-    color: MUTED_TEXT,
+    color: SOFT_TEXT,
     marginBottom: theme.spacing.md,
   },
   goalCard: {
@@ -284,19 +297,21 @@ const styles = StyleSheet.create({
     padding: theme.spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
   },
   goalIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#1E2A3C',
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: theme.colors.neonPurple,
     marginRight: theme.spacing.md,
   },
   goalContent: {
     flex: 1,
   },
   goalTitle: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontSize: 18,
     fontWeight: '700',
   },
@@ -307,28 +322,29 @@ const styles = StyleSheet.create({
   goalProgress: {
     height: 6,
     borderRadius: 999,
-    backgroundColor: CARD_BORDER,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     marginTop: theme.spacing.sm,
     overflow: 'hidden',
   },
   goalProgressFill: {
     height: '100%',
-    backgroundColor: PRIMARY_BLUE,
+    backgroundColor: theme.colors.neonGreen,
   },
   goalButton: {
-    backgroundColor: PRIMARY_BLUE,
+    backgroundColor: theme.colors.neonPink,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.sm,
-    borderRadius: 12,
+    borderRadius: theme.radius.pill,
     marginLeft: theme.spacing.md,
   },
   goalButtonText: {
-    color: 'white',
+    color: theme.colors.text,
     fontWeight: '700',
+    letterSpacing: 0.3,
   },
   readyTitle: {
-    color: theme.colors.mist,
-    fontSize: 22,
+    color: theme.colors.text,
+    fontSize: 24,
     fontWeight: '700',
     marginBottom: theme.spacing.sm,
   },
@@ -337,36 +353,41 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
   },
   primaryAction: {
-    backgroundColor: PRIMARY_BLUE,
     borderRadius: theme.radius.lg,
+    marginBottom: theme.spacing.sm,
+    overflow: 'hidden',
+  },
+  primaryActionInner: {
     paddingVertical: theme.spacing.md,
     alignItems: 'center',
-    marginBottom: theme.spacing.sm,
   },
   primaryActionText: {
-    color: 'white',
+    color: theme.colors.text,
     fontWeight: '700',
     fontSize: 16,
+    letterSpacing: 0.5,
   },
   secondaryAction: {
-    backgroundColor: CARD_BG,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderRadius: theme.radius.lg,
     paddingVertical: theme.spacing.md,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: CARD_BORDER,
+    borderColor: 'rgba(255, 255, 255, 0.16)',
   },
   secondaryActionText: {
-    color: theme.colors.mist,
-    fontWeight: '600',
+    color: theme.colors.neonBlue,
+    fontWeight: '700',
   },
   challengeCard: {
     backgroundColor: CARD_BG,
     borderRadius: theme.radius.lg,
     padding: theme.spacing.lg,
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
   },
   challengeTitle: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontSize: 16,
     fontWeight: '700',
   },
@@ -376,14 +397,14 @@ const styles = StyleSheet.create({
   },
   challengeBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: '#1C2B4D',
-    borderRadius: 10,
+    backgroundColor: theme.colors.neonPurple,
+    borderRadius: theme.radius.pill,
     paddingHorizontal: theme.spacing.sm,
     paddingVertical: 4,
     marginTop: theme.spacing.sm,
   },
   challengeBadgeText: {
-    color: '#A9C4FF',
+    color: theme.colors.text,
     fontWeight: '700',
     fontSize: 12,
   },
@@ -396,9 +417,9 @@ const styles = StyleSheet.create({
     borderColor: CARD_BORDER,
   },
   runTitle: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   runMeta: {
     color: MUTED_TEXT,

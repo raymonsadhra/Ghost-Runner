@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { getUserRuns, updateRunName, deleteRun } from '../services/firebaseService';
 import { theme } from '../theme';
+import OutsiderBackground from '../components/OutsiderBackground';
 
 const RUNS_LIMIT = 50;
 
@@ -170,7 +171,8 @@ export default function RunHistoryScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <OutsiderBackground accent="blue">
+      <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
         <Text style={styles.title}>Run History</Text>
         <Text style={styles.subtitle}>
@@ -209,7 +211,7 @@ export default function RunHistoryScreen() {
               value={editName}
               onChangeText={setEditName}
               placeholder="Run name"
-              placeholderTextColor="rgba(233, 242, 244, 0.5)"
+              placeholderTextColor="rgba(245, 242, 255, 0.5)"
               style={styles.modalInput}
               autoFocus
             />
@@ -237,14 +239,15 @@ export default function RunHistoryScreen() {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+      </SafeAreaView>
+    </OutsiderBackground>
   );
 }
 
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: theme.colors.ink,
+    backgroundColor: 'transparent',
   },
   header: {
     paddingHorizontal: theme.spacing.lg,
@@ -252,13 +255,12 @@ const styles = StyleSheet.create({
     paddingBottom: theme.spacing.md,
   },
   title: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontSize: 26,
     fontWeight: '700',
   },
   subtitle: {
-    color: theme.colors.mist,
-    opacity: 0.6,
+    color: theme.colors.textMuted,
     marginTop: 4,
   },
   list: {
@@ -266,21 +268,20 @@ const styles = StyleSheet.create({
     paddingBottom: theme.spacing.xl,
   },
   card: {
-    backgroundColor: '#121A2A',
+    backgroundColor: theme.colors.surfaceElevated,
     borderRadius: theme.radius.lg,
     padding: theme.spacing.lg,
     marginBottom: theme.spacing.md,
     borderWidth: 1,
-    borderColor: '#1E2A3C',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   cardTitle: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontSize: 18,
     fontWeight: '700',
   },
   cardMeta: {
-    color: theme.colors.mist,
-    opacity: 0.7,
+    color: theme.colors.textMuted,
     marginTop: 6,
   },
   cardActions: {
@@ -294,55 +295,56 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   renameButton: {
-    backgroundColor: theme.colors.secondary,
+    backgroundColor: theme.colors.neonPurple,
     marginRight: theme.spacing.sm,
   },
   deleteButton: {
     backgroundColor: theme.colors.danger,
   },
   actionText: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontWeight: '700',
   },
   emptyCard: {
-    backgroundColor: '#121A2A',
+    backgroundColor: theme.colors.surfaceElevated,
     borderRadius: theme.radius.lg,
     padding: theme.spacing.lg,
     borderWidth: 1,
-    borderColor: '#1E2A3C',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   emptyText: {
-    color: theme.colors.mist,
-    opacity: 0.7,
+    color: theme.colors.textMuted,
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(15, 20, 27, 0.7)',
+    backgroundColor: 'rgba(11, 10, 14, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: theme.spacing.lg,
   },
   modalCard: {
     width: '100%',
-    backgroundColor: '#121A2A',
+    backgroundColor: theme.colors.surfaceElevated,
     borderRadius: theme.radius.lg,
     padding: theme.spacing.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   modalTitle: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontSize: 18,
     fontWeight: '700',
     marginBottom: theme.spacing.sm,
   },
   modalInput: {
     borderWidth: 1,
-    borderColor: '#1E2A3C',
+    borderColor: 'rgba(255, 255, 255, 0.14)',
     borderRadius: theme.radius.md,
-    color: theme.colors.mist,
+    color: theme.colors.text,
     paddingHorizontal: theme.spacing.sm,
     paddingVertical: theme.spacing.sm,
     marginBottom: theme.spacing.md,
-    backgroundColor: '#0F1626',
+    backgroundColor: 'rgba(11, 10, 14, 0.7)',
   },
   modalActions: {
     flexDirection: 'row',
@@ -355,21 +357,21 @@ const styles = StyleSheet.create({
   },
   modalCancel: {
     borderWidth: 1,
-    borderColor: '#1E2A3C',
+    borderColor: 'rgba(255, 255, 255, 0.16)',
     marginRight: theme.spacing.sm,
   },
   modalCancelText: {
-    color: theme.colors.mist,
-    fontWeight: '600',
+    color: theme.colors.textMuted,
+    fontWeight: '700',
   },
   modalSave: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: theme.colors.neonPink,
   },
   modalSaveDisabled: {
     opacity: 0.6,
   },
   modalSaveText: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontWeight: '700',
   },
 });

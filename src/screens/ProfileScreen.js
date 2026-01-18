@@ -18,12 +18,11 @@ import { loadProfile, updateProfile } from '../services/profileService';
 import { AVATAR_BASES, COSMETICS, COSMETIC_CATEGORIES } from '../config/cosmetics';
 import { getProgressToNextLevel } from '../utils/leveling';
 import { theme } from '../theme';
+import OutsiderBackground from '../components/OutsiderBackground';
 
-const PRIMARY_BLUE = '#2F6BFF';
-const DARK_BG = '#0B0F17';
-const CARD_BG = '#121A2A';
-const CARD_BORDER = '#1E2A3C';
-const MUTED_TEXT = '#8FA4BF';
+const CARD_BG = theme.colors.surfaceElevated;
+const CARD_BORDER = 'rgba(255, 255, 255, 0.08)';
+const MUTED_TEXT = theme.colors.textMuted;
 
 function formatBadgeLabel(badgeId) {
   if (!badgeId) return 'Unknown';
@@ -169,8 +168,9 @@ export default function ProfileScreen() {
   }, []);
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.container}>
+    <OutsiderBackground accent="pink">
+      <SafeAreaView style={styles.safe}>
+        <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.profileHeader}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>
@@ -241,7 +241,7 @@ export default function ProfileScreen() {
               value={profileName}
               onChangeText={setProfileName}
               placeholder="Your name"
-              placeholderTextColor="rgba(233, 242, 244, 0.5)"
+              placeholderTextColor="rgba(245, 242, 255, 0.5)"
               style={styles.textInput}
             />
             <TouchableOpacity
@@ -388,19 +388,20 @@ export default function ProfileScreen() {
             </Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
-    </SafeAreaView>
+        </ScrollView>
+      </SafeAreaView>
+    </OutsiderBackground>
   );
 }
 
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: DARK_BG,
+    backgroundColor: 'transparent',
   },
   container: {
     padding: theme.spacing.lg,
-    paddingBottom: theme.spacing.xl,
+    paddingBottom: theme.spacing.xxl,
   },
   profileHeader: {
     flexDirection: 'row',
@@ -411,7 +412,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: PRIMARY_BLUE,
+    backgroundColor: theme.colors.neonPurple,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: theme.spacing.md,
@@ -425,7 +426,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   profileName: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontSize: 22,
     fontWeight: '700',
   },
@@ -443,7 +444,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statValue: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontSize: 18,
     fontWeight: '700',
   },
@@ -460,7 +461,7 @@ const styles = StyleSheet.create({
     borderColor: CARD_BORDER,
   },
   cardTitle: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontSize: 18,
     fontWeight: '700',
     marginBottom: theme.spacing.sm,
@@ -473,7 +474,7 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: PRIMARY_BLUE,
+    backgroundColor: theme.colors.neonPink,
   },
   progressMeta: {
     color: MUTED_TEXT,
@@ -488,7 +489,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   weekValue: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontSize: 20,
     fontWeight: '700',
   },
@@ -500,7 +501,7 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.lg,
   },
   sectionTitle: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontWeight: '700',
     fontSize: 18,
     marginBottom: theme.spacing.sm,
@@ -509,7 +510,7 @@ const styles = StyleSheet.create({
     color: MUTED_TEXT,
   },
   inputLabel: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontWeight: '600',
     marginBottom: theme.spacing.sm,
   },
@@ -517,14 +518,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: CARD_BORDER,
     borderRadius: theme.radius.md,
-    color: theme.colors.mist,
+    color: theme.colors.text,
     paddingHorizontal: theme.spacing.sm,
     paddingVertical: theme.spacing.sm,
     marginBottom: theme.spacing.sm,
-    backgroundColor: '#0F1626',
+    backgroundColor: 'rgba(11, 10, 14, 0.7)',
   },
   saveButton: {
-    backgroundColor: PRIMARY_BLUE,
+    backgroundColor: theme.colors.neonPink,
     borderRadius: theme.radius.md,
     paddingVertical: theme.spacing.sm,
     alignItems: 'center',
@@ -534,7 +535,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   saveButtonText: {
-    color: 'white',
+    color: theme.colors.text,
     fontWeight: '700',
   },
   optionRow: {
@@ -550,17 +551,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.sm,
     marginRight: theme.spacing.sm,
     marginBottom: theme.spacing.sm,
-    backgroundColor: '#0F1626',
+    backgroundColor: 'rgba(11, 10, 14, 0.7)',
   },
   optionChipActive: {
-    borderColor: PRIMARY_BLUE,
-    backgroundColor: 'rgba(47, 107, 255, 0.15)',
+    borderColor: theme.colors.neonBlue,
+    backgroundColor: 'rgba(85, 215, 255, 0.12)',
   },
   optionChipLocked: {
     opacity: 0.5,
   },
   optionText: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontWeight: '600',
   },
   optionHint: {
@@ -581,8 +582,8 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   badgeChip: {
-    backgroundColor: 'rgba(47, 107, 255, 0.12)',
-    borderColor: 'rgba(47, 107, 255, 0.4)',
+    backgroundColor: 'rgba(124, 92, 255, 0.15)',
+    borderColor: 'rgba(124, 92, 255, 0.45)',
     borderWidth: 1,
     borderRadius: 999,
     paddingHorizontal: theme.spacing.md,
@@ -591,12 +592,11 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.sm,
   },
   badgeText: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontWeight: '600',
   },
   sectionRow: {
-    color: theme.colors.mist,
-    opacity: 0.8,
+    color: theme.colors.textMuted,
     marginBottom: 4,
   },
   activityCard: {
@@ -608,7 +608,7 @@ const styles = StyleSheet.create({
     borderColor: CARD_BORDER,
   },
   activityTitle: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontWeight: '600',
     fontSize: 16,
   },
@@ -617,7 +617,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   seedButton: {
-    backgroundColor: CARD_BG,
+    backgroundColor: theme.colors.surfaceElevated,
     borderRadius: theme.radius.md,
     paddingVertical: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
@@ -629,7 +629,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   seedButtonText: {
-    color: MUTED_TEXT,
-    fontWeight: '600',
+    color: theme.colors.textMuted,
+    fontWeight: '700',
   },
 });

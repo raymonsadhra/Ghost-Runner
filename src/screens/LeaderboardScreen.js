@@ -9,12 +9,11 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { theme } from '../theme';
+import OutsiderBackground from '../components/OutsiderBackground';
 
-const PRIMARY_BLUE = '#2F6BFF';
-const DARK_BG = '#0B0F17';
-const CARD_BG = '#121A2A';
-const CARD_BORDER = '#1E2A3C';
-const MUTED_TEXT = '#8FA4BF';
+const CARD_BG = theme.colors.surfaceElevated;
+const CARD_BORDER = 'rgba(255, 255, 255, 0.08)';
+const MUTED_TEXT = theme.colors.textMuted;
 
 export default function LeaderboardScreen({ navigation }) {
   const [leaderboard, setLeaderboard] = useState([]);
@@ -65,10 +64,11 @@ export default function LeaderboardScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Leaderboards</Text>
-      </View>
+    <OutsiderBackground accent="green">
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Leaderboards</Text>
+        </View>
 
       <View style={styles.filterContainer}>
         <TouchableOpacity
@@ -121,7 +121,7 @@ export default function LeaderboardScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.container}>
+        <ScrollView contentContainerStyle={styles.container}>
         {isLoading ? (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyText}>Loading leaderboard...</Text>
@@ -173,15 +173,16 @@ export default function LeaderboardScreen({ navigation }) {
             </TouchableOpacity>
           ))
         )}
-      </ScrollView>
-    </SafeAreaView>
+        </ScrollView>
+      </SafeAreaView>
+    </OutsiderBackground>
   );
 }
 
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: DARK_BG,
+    backgroundColor: 'transparent',
   },
   header: {
     paddingHorizontal: theme.spacing.lg,
@@ -191,7 +192,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 28,
     fontWeight: '700',
-    color: theme.colors.mist,
+    color: theme.colors.text,
   },
   filterContainer: {
     flexDirection: 'row',
@@ -210,16 +211,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   filterButtonActive: {
-    backgroundColor: PRIMARY_BLUE,
-    borderColor: PRIMARY_BLUE,
+    backgroundColor: theme.colors.neonPink,
+    borderColor: theme.colors.neonPink,
   },
   filterText: {
-    color: MUTED_TEXT,
+    color: theme.colors.textMuted,
     fontWeight: '600',
     fontSize: 14,
   },
   filterTextActive: {
-    color: 'white',
+    color: theme.colors.text,
   },
   container: {
     padding: theme.spacing.lg,
@@ -243,7 +244,7 @@ const styles = StyleSheet.create({
   rankText: {
     fontSize: 20,
     fontWeight: '700',
-    color: theme.colors.mist,
+    color: theme.colors.text,
   },
   userInfo: {
     flex: 1,
@@ -254,7 +255,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: PRIMARY_BLUE,
+    backgroundColor: theme.colors.neonPurple,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: theme.spacing.md,
@@ -268,12 +269,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   userName: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontSize: 16,
     fontWeight: '600',
   },
   userStats: {
-    color: MUTED_TEXT,
+    color: theme.colors.textMuted,
     fontSize: 12,
     marginTop: 2,
   },
@@ -283,17 +284,17 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   distanceValue: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontSize: 18,
     fontWeight: '700',
   },
   distanceLabel: {
-    color: MUTED_TEXT,
+    color: theme.colors.textMuted,
     fontSize: 12,
     marginTop: 2,
   },
   chevron: {
-    color: MUTED_TEXT,
+    color: theme.colors.textMuted,
     fontSize: 22,
     fontWeight: '300',
   },
@@ -306,7 +307,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyText: {
-    color: MUTED_TEXT,
+    color: theme.colors.textMuted,
     textAlign: 'center',
   },
 });

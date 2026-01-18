@@ -10,12 +10,13 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { getUserRuns } from '../services/firebaseService';
 import { theme } from '../theme';
+import OutsiderBackground from '../components/OutsiderBackground';
 
 const RUNS_LIMIT = 50;
-const PRIMARY_BLUE = '#2F6BFF';
-const CARD_BG = '#121A2A';
-const CARD_BORDER = '#1E2A3C';
-const MUTED_TEXT = '#8FA4BF';
+const PRIMARY_BLUE = theme.colors.neonPink;
+const CARD_BG = theme.colors.surfaceElevated;
+const CARD_BORDER = 'rgba(255, 255, 255, 0.08)';
+const MUTED_TEXT = theme.colors.textMuted;
 
 function formatDate(timestamp) {
   return new Date(timestamp ?? Date.now()).toLocaleDateString(undefined, {
@@ -101,52 +102,54 @@ export default function UserRunHistoryScreen({ route, navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {(userName || 'R').slice(0, 2).toUpperCase()}
-            </Text>
-          </View>
-          <View style={styles.headerText}>
-            <Text style={styles.title}>{userName}'s Runs</Text>
-            <Text style={styles.subtitle}>
-              {isLoading ? 'Loading...' : `${runs.length} runs`}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {isLoading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={PRIMARY_BLUE} />
-        </View>
-      ) : error ? (
-        <View style={styles.emptyCard}>
-          <Text style={styles.emptyText}>{error}</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={runs}
-          renderItem={renderRun}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.list}
-          ListEmptyComponent={
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyText}>No runs to show.</Text>
+    <OutsiderBackground accent="blue">
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.header}>
+          <View style={styles.headerTop}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>
+                {(userName || 'R').slice(0, 2).toUpperCase()}
+              </Text>
             </View>
-          }
-        />
-      )}
-    </SafeAreaView>
+            <View style={styles.headerText}>
+              <Text style={styles.title}>{userName}'s Runs</Text>
+              <Text style={styles.subtitle}>
+                {isLoading ? 'Loading...' : `${runs.length} runs`}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {isLoading ? (
+          <View style={styles.centered}>
+            <ActivityIndicator size="large" color={PRIMARY_BLUE} />
+          </View>
+        ) : error ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyText}>{error}</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={runs}
+            renderItem={renderRun}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.list}
+            ListEmptyComponent={
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyText}>No runs to show.</Text>
+              </View>
+            }
+          />
+        )}
+      </SafeAreaView>
+    </OutsiderBackground>
   );
 }
 
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: theme.colors.ink,
+    backgroundColor: 'transparent',
   },
   header: {
     paddingHorizontal: theme.spacing.lg,
@@ -163,7 +166,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: PRIMARY_BLUE,
+    backgroundColor: theme.colors.neonPurple,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: theme.spacing.md,
@@ -177,12 +180,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontSize: 22,
     fontWeight: '700',
   },
   subtitle: {
-    color: MUTED_TEXT,
+    color: theme.colors.textMuted,
     fontSize: 14,
     marginTop: 2,
   },
@@ -205,12 +208,12 @@ const styles = StyleSheet.create({
     borderColor: CARD_BORDER,
   },
   cardTitle: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontSize: 18,
     fontWeight: '700',
   },
   cardMeta: {
-    color: MUTED_TEXT,
+    color: theme.colors.textMuted,
     fontSize: 14,
     marginTop: 6,
   },
@@ -225,7 +228,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyText: {
-    color: MUTED_TEXT,
+    color: theme.colors.textMuted,
     textAlign: 'center',
     fontSize: 15,
   },

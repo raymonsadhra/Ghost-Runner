@@ -8,11 +8,13 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import MapView, { Polyline } from 'react-native-maps';
 
 import { theme } from '../theme';
 import { updateRunName } from '../services/firebaseService';
 import { awardBossRewards } from '../services/rewardService';
+import OutsiderBackground from '../components/OutsiderBackground';
 
 const DEFAULT_REGION = {
   latitude: 37.7749,
@@ -103,21 +105,22 @@ export default function SummaryScreen({ navigation, route }) {
   }, [ghostMeta?.id, ghostResult?.won, isBoss, rewardApplied]);
 
   return (
-    <View style={styles.container}>
-      <MapView style={styles.map} initialRegion={getInitialRegion(routePoints)}>
-        <Polyline
-          coordinates={routePoints}
-          strokeColor={theme.colors.secondary}
-          strokeWidth={4}
-        />
-      </MapView>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 120 : 80}
-        style={styles.panelWrapper}
-      >
-        <View style={styles.panel}>
-          <Text style={styles.title}>Run Complete</Text>
+    <OutsiderBackground accent="pink">
+      <View style={styles.container}>
+        <MapView style={styles.map} initialRegion={getInitialRegion(routePoints)}>
+          <Polyline
+            coordinates={routePoints}
+            strokeColor={theme.colors.neonPink}
+            strokeWidth={4}
+          />
+        </MapView>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 120 : 80}
+          style={styles.panelWrapper}
+        >
+          <View style={styles.panel}>
+            <Text style={styles.title}>Run Complete</Text>
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
               <Text style={styles.statValue}>{(distance / 1000).toFixed(2)}</Text>
@@ -182,56 +185,65 @@ export default function SummaryScreen({ navigation, route }) {
             </View>
           )}
 
-          <View style={styles.nameCard}>
-          <Text style={styles.nameLabel}>Name this run</Text>
-          <TextInput
-            value={runName}
-            onChangeText={setRunName}
-            placeholder="Run name"
-            placeholderTextColor="rgba(233, 242, 244, 0.5)"
-            style={styles.nameInput}
-          />
-          <TouchableOpacity
-            style={[
-              styles.nameButton,
-              (!isDirty || isSavingName) && styles.nameButtonDisabled,
-            ]}
-            onPress={handleSaveName}
-            disabled={!isDirty || isSavingName}
-          >
-            <Text style={styles.nameButtonText}>
-              {isSavingName ? 'Saving...' : 'Save Name'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+            <View style={styles.nameCard}>
+              <Text style={styles.nameLabel}>Name this run</Text>
+              <TextInput
+                value={runName}
+                onChangeText={setRunName}
+                placeholder="Run name"
+                placeholderTextColor="rgba(245, 242, 255, 0.5)"
+                style={styles.nameInput}
+              />
+              <TouchableOpacity
+                style={[
+                  styles.nameButton,
+                  (!isDirty || isSavingName) && styles.nameButtonDisabled,
+                ]}
+                onPress={handleSaveName}
+                disabled={!isDirty || isSavingName}
+              >
+                <Text style={styles.nameButtonText}>
+                  {isSavingName ? 'Saving...' : 'Save Name'}
+                </Text>
+              </TouchableOpacity>
+            </View>
 
-        <TouchableOpacity
-          style={styles.primaryButton}
-          onPress={() =>
-            navigation.navigate('GhostRun', {
-              ghostRoute: routePoints,
-            })
-          }
-        >
-          <Text style={styles.primaryText}>Race This Ghost</Text>
-        </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.primaryButton}
+              onPress={() =>
+                navigation.navigate('GhostRun', {
+                  ghostRoute: routePoints,
+                })
+              }
+              activeOpacity={0.85}
+            >
+              <LinearGradient
+                colors={[theme.colors.neonPink, theme.colors.neonPurple]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.primaryButtonInner}
+              >
+                <Text style={styles.primaryText}>Race This Ghost</Text>
+              </LinearGradient>
+            </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.secondaryButton}
-          onPress={() => navigation.navigate('Home')}
-        >
-          <Text style={styles.secondaryText}>Back to Home</Text>
-        </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
-    </View>
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={() => navigation.navigate('Home')}
+            >
+              <Text style={styles.secondaryText}>Back to Home</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </View>
+    </OutsiderBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.ink,
+    backgroundColor: 'transparent',
   },
   map: {
     flex: 1,
@@ -243,12 +255,14 @@ const styles = StyleSheet.create({
     bottom: theme.spacing.lg,
   },
   panel: {
-    backgroundColor: 'rgba(15, 20, 27, 0.92)',
+    backgroundColor: 'rgba(21, 19, 28, 0.92)',
     borderRadius: theme.radius.lg,
     padding: theme.spacing.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   title: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontSize: 24,
     fontWeight: '700',
     marginBottom: theme.spacing.md,
@@ -259,77 +273,78 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: '#121A2A',
+    backgroundColor: theme.colors.surfaceElevated,
     borderRadius: theme.radius.md,
     padding: theme.spacing.sm,
     alignItems: 'center',
     marginRight: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   statValue: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontWeight: '700',
     fontSize: 18,
   },
   statLabel: {
-    color: theme.colors.mist,
-    opacity: 0.6,
+    color: theme.colors.textMuted,
     marginTop: 4,
   },
   ghostCard: {
-    backgroundColor: 'rgba(47, 107, 255, 0.12)',
+    backgroundColor: 'rgba(124, 92, 255, 0.18)',
     borderRadius: theme.radius.md,
     padding: theme.spacing.md,
     marginBottom: theme.spacing.lg,
     borderWidth: 1,
-    borderColor: 'rgba(47, 107, 255, 0.4)',
+    borderColor: 'rgba(124, 92, 255, 0.45)',
   },
   ghostTitle: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontWeight: '700',
     fontSize: 16,
   },
   ghostMeta: {
-    color: theme.colors.mist,
-    opacity: 0.75,
+    color: theme.colors.textMuted,
     marginTop: 6,
   },
   rewardList: {
     marginTop: theme.spacing.sm,
   },
   rewardItem: {
-    color: theme.colors.accent,
+    color: theme.colors.neonGreen,
     fontWeight: '600',
     marginTop: 2,
   },
   rewardNote: {
-    color: theme.colors.mist,
-    opacity: 0.6,
+    color: theme.colors.textMuted,
     marginTop: theme.spacing.xs,
     fontSize: 12,
   },
   nameCard: {
-    backgroundColor: '#121A2A',
+    backgroundColor: theme.colors.surfaceElevated,
     borderRadius: theme.radius.md,
     padding: theme.spacing.md,
     marginBottom: theme.spacing.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   nameLabel: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontWeight: '600',
     marginBottom: theme.spacing.sm,
   },
   nameInput: {
     borderWidth: 1,
-    borderColor: '#1E2A3C',
+    borderColor: 'rgba(255, 255, 255, 0.14)',
     borderRadius: theme.radius.md,
-    color: theme.colors.mist,
+    color: theme.colors.text,
     paddingHorizontal: theme.spacing.sm,
     paddingVertical: theme.spacing.sm,
     marginBottom: theme.spacing.sm,
-    backgroundColor: '#0F1626',
+    backgroundColor: 'rgba(11, 10, 14, 0.7)',
   },
   nameButton: {
-    backgroundColor: theme.colors.secondary,
+    backgroundColor: theme.colors.neonPurple,
     borderRadius: theme.radius.md,
     paddingVertical: theme.spacing.sm,
     alignItems: 'center',
@@ -338,31 +353,34 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   nameButtonText: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontWeight: '700',
   },
   primaryButton: {
-    backgroundColor: theme.colors.primary,
     borderRadius: theme.radius.lg,
+    marginBottom: theme.spacing.sm,
+    overflow: 'hidden',
+  },
+  primaryButtonInner: {
     paddingVertical: theme.spacing.md,
     alignItems: 'center',
-    marginBottom: theme.spacing.sm,
   },
   primaryText: {
-    color: theme.colors.mist,
+    color: theme.colors.text,
     fontWeight: '800',
     fontSize: 16,
   },
   secondaryButton: {
-    borderColor: theme.colors.mist,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
     borderWidth: 1,
     borderRadius: theme.radius.lg,
     paddingVertical: theme.spacing.md,
     alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
   },
   secondaryText: {
-    color: theme.colors.mist,
-    fontWeight: '600',
+    color: theme.colors.neonBlue,
+    fontWeight: '700',
     fontSize: 16,
   },
 });
