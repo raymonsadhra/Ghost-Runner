@@ -226,7 +226,7 @@ export default function ProfileScreen({ navigation }) {
   return (
     <OutsiderBackground accent="pink">
       <SafeAreaView style={styles.safe}>
-        <ScrollView contentContainerStyle={styles.container}>
+        <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 100 }]}>
         <View style={styles.profileHeader}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>
@@ -521,8 +521,9 @@ const styles = StyleSheet.create({
   },
   profileName: {
     color: theme.colors.text,
-    fontSize: 22,
-    fontWeight: '700',
+    fontSize: 26,
+    fontWeight: '900',
+    letterSpacing: -0.5,
   },
   profileLocation: {
     color: MUTED_TEXT,
@@ -539,26 +540,35 @@ const styles = StyleSheet.create({
   },
   statValue: {
     color: theme.colors.text,
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.3,
   },
   statLabel: {
     color: MUTED_TEXT,
-    marginTop: 4,
+    marginTop: 6,
+    fontSize: 13,
+    fontWeight: '500',
   },
   card: {
-    backgroundColor: CARD_BG,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.lg,
-    marginBottom: theme.spacing.lg,
+    backgroundColor: 'rgba(29, 26, 38, 0.6)',
+    borderRadius: 20,
+    padding: 24,
+    marginBottom: 20,
     borderWidth: 1,
-    borderColor: CARD_BORDER,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
   },
   cardTitle: {
     color: theme.colors.text,
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: theme.spacing.sm,
+    fontSize: 22,
+    fontWeight: '800',
+    marginBottom: 16,
+    letterSpacing: -0.3,
   },
   progressBar: {
     height: 8,
@@ -632,21 +642,25 @@ const styles = StyleSheet.create({
   },
   weekValue: {
     color: theme.colors.text,
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: -0.3,
   },
   weekLabel: {
     color: MUTED_TEXT,
-    marginTop: 4,
+    marginTop: 6,
+    fontSize: 13,
+    fontWeight: '500',
   },
   section: {
     marginBottom: theme.spacing.lg,
   },
   sectionTitle: {
     color: theme.colors.text,
-    fontWeight: '700',
-    fontSize: 18,
-    marginBottom: theme.spacing.sm,
+    fontWeight: '800',
+    fontSize: 24,
+    marginBottom: theme.spacing.md,
+    letterSpacing: -0.3,
   },
   sectionEmpty: {
     color: MUTED_TEXT,
@@ -668,17 +682,23 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     backgroundColor: theme.colors.neonPink,
-    borderRadius: theme.radius.md,
-    paddingVertical: theme.spacing.sm,
+    borderRadius: 16,
+    paddingVertical: 14,
     alignItems: 'center',
     marginBottom: theme.spacing.lg,
+    shadowColor: theme.colors.neonPink,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 6,
   },
   saveButtonDisabled: {
     opacity: 0.6,
   },
   saveButtonText: {
     color: theme.colors.text,
-    fontWeight: '700',
+    fontWeight: '800',
+    fontSize: 16,
   },
   optionRow: {
     flexDirection: 'row',

@@ -166,7 +166,7 @@ export default function LeaderboardScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-        <ScrollView contentContainerStyle={styles.container}>
+        <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 100 }]}>
         {isLoading ? (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyText}>Loading leaderboard...</Text>
@@ -242,9 +242,10 @@ const styles = StyleSheet.create({
     paddingBottom: theme.spacing.sm,
   },
   headerTitle: {
-    fontSize: 28,
-    fontWeight: '700',
+    fontSize: 36,
+    fontWeight: '900',
     color: theme.colors.text,
+    letterSpacing: -0.5,
   },
   filterContainer: {
     flexDirection: 'row',
@@ -254,25 +255,35 @@ const styles = StyleSheet.create({
   },
   filterButton: {
     flex: 1,
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.radius.md,
-    backgroundColor: CARD_BG,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    borderRadius: 14,
+    backgroundColor: 'rgba(29, 26, 38, 0.6)',
     borderWidth: 1,
-    borderColor: CARD_BORDER,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   filterButtonActive: {
     backgroundColor: theme.colors.neonPink,
     borderColor: theme.colors.neonPink,
+    shadowColor: theme.colors.neonPink,
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 5,
   },
   filterText: {
     color: theme.colors.textMuted,
     fontWeight: '600',
-    fontSize: 14,
+    fontSize: 15,
   },
   filterTextActive: {
     color: theme.colors.text,
+    fontWeight: '700',
   },
   container: {
     padding: theme.spacing.lg,
@@ -281,17 +292,26 @@ const styles = StyleSheet.create({
   leaderboardCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: CARD_BG,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.sm,
+    backgroundColor: 'rgba(29, 26, 38, 0.6)',
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 12,
     borderWidth: 1,
-    borderColor: CARD_BORDER,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   currentUserCard: {
     borderWidth: 2,
     borderColor: theme.colors.neonPink,
-    backgroundColor: 'rgba(255, 45, 122, 0.1)',
+    backgroundColor: 'rgba(255, 45, 122, 0.15)',
+    shadowColor: theme.colors.neonPink,
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   rankContainer: {
     width: 40,
@@ -327,27 +347,30 @@ const styles = StyleSheet.create({
   },
   userName: {
     color: theme.colors.text,
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: -0.2,
   },
   currentUserName: {
     color: theme.colors.neonPink,
-    fontWeight: '700',
+    fontWeight: '900',
   },
   userStats: {
     color: theme.colors.textMuted,
-    fontSize: 12,
-    marginTop: 2,
+    fontSize: 13,
+    marginTop: 4,
+    fontWeight: '500',
   },
   distanceContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   distanceValue: {
     color: theme.colors.text,
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.3,
   },
   distanceLabel: {
     color: theme.colors.textMuted,

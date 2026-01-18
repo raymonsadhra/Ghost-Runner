@@ -181,7 +181,7 @@ export default function FriendsScreen({ navigation }) {
           <Text style={styles.headerTitle}>Friends</Text>
         </View>
 
-        <ScrollView contentContainerStyle={styles.container}>
+        <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 100 }]}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Add Friend</Text>
           <View style={styles.searchContainer}>
@@ -378,12 +378,17 @@ const styles = StyleSheet.create({
     color: theme.colors.neonGreen,
   },
   requestCard: {
-    backgroundColor: CARD_BG,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.sm,
+    backgroundColor: 'rgba(29, 26, 38, 0.6)',
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 12,
     borderWidth: 1,
-    borderColor: CARD_BORDER,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   requestInfo: {
     flexDirection: 'row',
@@ -396,8 +401,9 @@ const styles = StyleSheet.create({
   },
   requestName: {
     color: theme.colors.text,
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: -0.2,
   },
   requestMeta: {
     color: theme.colors.textMuted,
@@ -433,12 +439,17 @@ const styles = StyleSheet.create({
   friendCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: CARD_BG,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.sm,
+    backgroundColor: 'rgba(29, 26, 38, 0.6)',
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 12,
     borderWidth: 1,
-    borderColor: CARD_BORDER,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   friendInfo: {
     flex: 1,
@@ -468,8 +479,9 @@ const styles = StyleSheet.create({
   },
   friendName: {
     color: theme.colors.text,
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: -0.2,
   },
   friendMeta: {
     color: theme.colors.textMuted,
