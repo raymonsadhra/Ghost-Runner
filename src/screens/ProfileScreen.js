@@ -7,10 +7,12 @@ import {
   ScrollView,
   TextInput,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
 import { getUserRuns } from '../services/firebaseService';
+import { seedFakeRuns } from '../services/seedFakeRuns';
 import { loadRewards } from '../services/rewardService';
 import { loadProfile, updateProfile } from '../services/profileService';
 import { AVATAR_BASES, COSMETICS, COSMETIC_CATEGORIES } from '../config/cosmetics';
@@ -47,6 +49,7 @@ export default function ProfileScreen() {
   const [profile, setProfile] = useState(null);
   const [profileName, setProfileName] = useState('');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isSeeding, setIsSeeding] = useState(false);
   const [runs, setRuns] = useState([]);
 
   useFocusEffect(
@@ -130,6 +133,40 @@ export default function ProfileScreen() {
     },
     [currentOutfit, updateProfilePatch]
   );
+
+  const handleSeedFakeRuns = useCallback(async () => {
+    Alert.alert(
+      'Seed fake runs',
+      'Add 10 fake runs each for anon + Runner 1–5 (60 total)? This uses your Firebase.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Seed',
+          onPress: async () => {
+            setIsSeeding(true);
+            try {
+              const { saved, failed, errors } = await seedFakeRuns({
+                withLeaderboardUsers: true,
+                runsPerUser: 10,
+              });
+              const msg = failed > 0
+                ? `Saved: ${saved}. Failed: ${failed}. ${errors[0] || ''}`
+                : `Done. ${saved} runs saved to Firebase.`;
+              Alert.alert('Seed complete', msg);
+              if (saved > 0) {
+                const data = await getUserRuns(undefined, { max: 5 });
+                setRuns(data ?? []);
+              }
+            } catch (e) {
+              Alert.alert('Seed failed', e?.message || String(e));
+            } finally {
+              setIsSeeding(false);
+            }
+          },
+        },
+      ]
+    );
+  }, []);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -331,12 +368,25 @@ export default function ProfileScreen() {
                     new Date(run.timestamp ?? Date.now()).toLocaleDateString()}
                 </Text>
                 <Text style={styles.activityMeta}>
-                  {(run.distance / 1000).toFixed(2)} km •{' '}
+                  {(run.distanceKm ?? (run.distance ?? 0) / 1000).toFixed(2)} km •{' '}
                   {Math.floor((run.duration ?? 0) / 60)} min
                 </Text>
               </View>
             ))
           )}
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Developer</Text>
+          <TouchableOpacity
+            style={[styles.seedButton, isSeeding && styles.seedButtonDisabled]}
+            onPress={handleSeedFakeRuns}
+            disabled={isSeeding}
+          >
+            <Text style={styles.seedButtonText}>
+              {isSeeding ? 'Seeding…' : 'Seed fake runs to Firebase'}
+            </Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -565,5 +615,21 @@ const styles = StyleSheet.create({
   activityMeta: {
     color: MUTED_TEXT,
     marginTop: 4,
+  },
+  seedButton: {
+    backgroundColor: CARD_BG,
+    borderRadius: theme.radius.md,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+    alignItems: 'center',
+  },
+  seedButtonDisabled: {
+    opacity: 0.6,
+  },
+  seedButtonText: {
+    color: MUTED_TEXT,
+    fontWeight: '600',
   },
 });

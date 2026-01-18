@@ -134,14 +134,24 @@ export default function LeaderboardScreen({ navigation }) {
           </View>
         ) : (
           leaderboard.map((entry) => (
-            <View key={entry.id} style={styles.leaderboardCard}>
+            <TouchableOpacity
+              key={entry.id}
+              style={styles.leaderboardCard}
+              activeOpacity={0.7}
+              onPress={() =>
+                navigation.navigate('UserRunHistory', {
+                  userId: entry.userId ?? entry.id,
+                  userName: entry.name ?? 'Runner',
+                })
+              }
+            >
               <View style={styles.rankContainer}>
                 <Text style={styles.rankText}>{getRankIcon(entry.rank)}</Text>
               </View>
               <View style={styles.userInfo}>
                 <View style={styles.avatar}>
                   <Text style={styles.avatarText}>
-                    {entry.name.slice(0, 2).toUpperCase()}
+                    {(entry.name ?? 'R').slice(0, 2).toUpperCase()}
                   </Text>
                 </View>
                 <View style={styles.userDetails}>
@@ -152,12 +162,15 @@ export default function LeaderboardScreen({ navigation }) {
                 </View>
               </View>
               <View style={styles.distanceContainer}>
-                <Text style={styles.distanceValue}>
-                  {entry.distance.toFixed(1)}
-                </Text>
-                <Text style={styles.distanceLabel}>km</Text>
+                <View>
+                  <Text style={styles.distanceValue}>
+                    {entry.distance.toFixed(1)}
+                  </Text>
+                  <Text style={styles.distanceLabel}>km</Text>
+                </View>
+                <Text style={styles.chevron}>›</Text>
               </View>
-            </View>
+            </TouchableOpacity>
           ))
         )}
       </ScrollView>
@@ -265,7 +278,9 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   distanceContainer: {
-    alignItems: 'flex-end',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   distanceValue: {
     color: theme.colors.mist,
@@ -276,6 +291,11 @@ const styles = StyleSheet.create({
     color: MUTED_TEXT,
     fontSize: 12,
     marginTop: 2,
+  },
+  chevron: {
+    color: MUTED_TEXT,
+    fontSize: 22,
+    fontWeight: '300',
   },
   emptyCard: {
     backgroundColor: CARD_BG,
