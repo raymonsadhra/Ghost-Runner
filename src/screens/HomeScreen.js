@@ -11,6 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { theme } from '../theme';
 import { getUserRuns } from '../services/firebaseService';
+import { auth } from '../firebase';
 import OutsiderBackground from '../components/OutsiderBackground';
 
 const CARD_BG = theme.colors.surfaceElevated;
@@ -36,6 +37,7 @@ export default function HomeScreen({ navigation }) {
       const loadRuns = async () => {
         setIsLoading(true);
         try {
+          // getUserRuns() will automatically use auth.currentUser.uid
           const data = await getUserRuns();
           if (active) {
             setRuns(data);
@@ -55,7 +57,7 @@ export default function HomeScreen({ navigation }) {
       return () => {
         active = false;
       };
-    }, [])
+    }, [auth?.currentUser?.uid])
   );
 
   const summary = useMemo(() => {

@@ -1,12 +1,9 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { arrayUnion, doc, increment, setDoc } from 'firebase/firestore';
+import { arrayUnion, doc, increment, setDoc, getDoc } from 'firebase/firestore';
 
 import { auth, db } from '../firebase';
 
-const LOCAL_REWARDS_KEY = 'ghost_runner_rewards';
-
 function getUserId() {
-  return auth?.currentUser?.uid ?? 'anon';
+  return auth?.currentUser?.uid;
 }
 
 function hasFirebaseConfig() {
@@ -24,19 +21,58 @@ function normalizeRewards(raw) {
   };
 }
 
-export async function loadRewards() {
+export async function loadRewards(userId = null) {
+  const uid = userId || getUserId();
+  if (!uid) {
+    return normalizeRewards({});
+  }
+
   try {
-    const raw = await AsyncStorage.getItem(LOCAL_REWARDS_KEY);
-    if (!raw) return normalizeRewards({});
-    return normalizeRewards(JSON.parse(raw));
+    if (hasFirebaseConfig()) {
+      const userRef = doc(db, 'Users', uid);
+      const userSnap = await getDoc(userRef);
+      
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        return normalizeRewards({
+          xp: userData.xp,
+          badges: userData.badges,
+          unlocks: userData.unlocks,
+          bossWins: userData.bossWins,
+          runXpRuns: userData.runXpRuns,
+        });
+      }
+    }
+    return normalizeRewards({});
   } catch (error) {
+    console.error('Error loading rewards:', error);
     return normalizeRewards({});
   }
 }
 
-async function saveRewards(next) {
+async function saveRewards(next, userId = null) {
+  const uid = userId || getUserId();
+  if (!uid) {
+    return normalizeRewards(next);
+  }
+
   const payload = normalizeRewards(next);
-  await AsyncStorage.setItem(LOCAL_REWARDS_KEY, JSON.stringify(payload));
+  
+  if (hasFirebaseConfig()) {
+    try {
+      const userRef = doc(db, 'Users', uid);
+      await setDoc(userRef, {
+        xp: payload.xp,
+        badges: payload.badges,
+        unlocks: payload.unlocks,
+        bossWins: payload.bossWins,
+        runXpRuns: payload.runXpRuns,
+      }, { merge: true });
+    } catch (error) {
+      console.error('Error saving rewards:', error);
+    }
+  }
+  
   return payload;
 }
 
@@ -48,10 +84,15 @@ function unique(list) {
 export async function awardRunXp({
   runId,
   localId,
-  userId = getUserId(),
+  userId = null,
   xp = 50,
 } = {}) {
-  const existing = normalizeRewards(await loadRewards());
+  const uid = userId || getUserId();
+  if (!uid) {
+    return normalizeRewards({});
+  }
+
+  const existing = normalizeRewards(await loadRewards(uid));
   const runKeys = unique([runId, localId].filter(Boolean));
   const runXpRuns = Array.isArray(existing?.runXpRuns) ? existing.runXpRuns : [];
   const hasAwarded = runKeys.length > 0 && runXpRuns && Array.isArray(runXpRuns) && runKeys.some((key) => runXpRuns.includes(key));
@@ -65,19 +106,20 @@ export async function awardRunXp({
     runXpRuns: unique([...runXpRuns, ...runKeys]),
   };
 
-  const saved = await saveRewards(next);
+  const saved = await saveRewards(next, uid);
 
   if (hasFirebaseConfig()) {
     try {
       await setDoc(
-        doc(db, 'users', userId),
+        doc(db, 'Users', uid),
         {
           xp: increment(xp),
+          runXpRuns: arrayUnion(...runKeys),
         },
         { merge: true }
       );
     } catch (error) {
-      // Keep local rewards if remote fails.
+      console.error('Error saving run XP to Firestore:', error);
     }
   }
 
@@ -90,12 +132,17 @@ export async function awardRunXp({
 
 export async function awardBossRewards({
   bossId,
-  userId = getUserId(),
+  userId = null,
   xp = 200,
   badgeId = 'boss_slayer',
   unlocks = ['boss_theme'],
 } = {}) {
-  const existing = normalizeRewards(await loadRewards());
+  const uid = userId || getUserId();
+  if (!uid) {
+    return normalizeRewards({});
+  }
+
+  const existing = normalizeRewards(await loadRewards(uid));
   const bossWins = Array.isArray(existing?.bossWins) ? existing.bossWins : [];
   const existingBadges = Array.isArray(existing?.badges) ? existing.badges : [];
   const existingUnlocks = Array.isArray(existing?.unlocks) ? existing.unlocks : [];
@@ -110,7 +157,7 @@ export async function awardBossRewards({
     bossWins: unique([...bossWins, bossId]),
   };
 
-  const saved = await saveRewards(next);
+  const saved = await saveRewards(next, uid);
 
   if (hasFirebaseConfig()) {
     try {
@@ -124,9 +171,9 @@ export async function awardBossRewards({
       if (unlocks.length) {
         updates.unlocks = arrayUnion(...unlocks);
       }
-      await setDoc(doc(db, 'users', userId), updates, { merge: true });
+      await setDoc(doc(db, 'Users', uid), updates, { merge: true });
     } catch (error) {
-      // Keep local rewards if remote fails.
+      console.error('Error saving boss rewards to Firestore:', error);
     }
   }
 

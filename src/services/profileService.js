@@ -1,6 +1,5 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const LOCAL_PROFILE_KEY = 'ghost_runner_profile';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { db, auth } from '../firebase';
 
 const DEFAULT_PROFILE = {
   name: 'Runner',
@@ -14,41 +13,83 @@ const DEFAULT_PROFILE = {
   },
 };
 
-export async function loadProfile() {
+function getUserId() {
+  return auth?.currentUser?.uid;
+}
+
+export async function loadProfile(userId = null) {
+  const uid = userId || getUserId();
+  if (!uid) {
+    return { ...DEFAULT_PROFILE };
+  }
+
   try {
-    const raw = await AsyncStorage.getItem(LOCAL_PROFILE_KEY);
-    if (!raw) return { ...DEFAULT_PROFILE };
-    const parsed = JSON.parse(raw);
-    return {
-      ...DEFAULT_PROFILE,
-      ...parsed,
-      outfit: {
-        ...DEFAULT_PROFILE.outfit,
-        ...(parsed?.outfit ?? {}),
-      },
-    };
+    const userRef = doc(db, 'Users', uid);
+    const userSnap = await getDoc(userRef);
+    
+    if (userSnap.exists()) {
+      const userData = userSnap.data();
+      return {
+        ...DEFAULT_PROFILE,
+        name: userData.name || userData.displayName || DEFAULT_PROFILE.name,
+        base: userData.base || DEFAULT_PROFILE.base,
+        outfit: {
+          ...DEFAULT_PROFILE.outfit,
+          ...(userData.outfit ?? {}),
+        },
+      };
+    }
+    
+    // If user document doesn't exist, return default
+    return { ...DEFAULT_PROFILE };
   } catch (error) {
+    console.error('Error loading profile:', error);
     return { ...DEFAULT_PROFILE };
   }
 }
 
-export async function saveProfile(profile) {
-  const payload = {
-    ...DEFAULT_PROFILE,
-    ...profile,
-    outfit: {
-      ...DEFAULT_PROFILE.outfit,
-      ...(profile?.outfit ?? {}),
-    },
-  };
-  await AsyncStorage.setItem(LOCAL_PROFILE_KEY, JSON.stringify(payload));
-  return payload;
+export async function saveProfile(profile, userId = null) {
+  const uid = userId || getUserId();
+  if (!uid) {
+    throw new Error('User not authenticated');
+  }
+
+  try {
+    const userRef = doc(db, 'Users', uid);
+    const userSnap = await getDoc(userRef);
+    
+    const payload = {
+      ...DEFAULT_PROFILE,
+      ...profile,
+      outfit: {
+        ...DEFAULT_PROFILE.outfit,
+        ...(profile?.outfit ?? {}),
+      },
+    };
+
+    // Merge with existing user data
+    const existingData = userSnap.exists() ? userSnap.data() : {};
+    
+    await setDoc(userRef, {
+      ...existingData,
+      name: payload.name,
+      displayName: payload.name,
+      base: payload.base,
+      outfit: payload.outfit,
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+    
+    return payload;
+  } catch (error) {
+    console.error('Error saving profile:', error);
+    throw error;
+  }
 }
 
-export async function updateProfile(patch) {
-  const current = await loadProfile();
+export async function updateProfile(patch, userId = null) {
+  const current = await loadProfile(userId);
   return saveProfile({
     ...current,
     ...patch,
-  });
+  }, userId);
 }

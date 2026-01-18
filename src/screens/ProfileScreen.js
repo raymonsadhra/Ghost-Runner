@@ -15,6 +15,7 @@ import { getUserRuns } from '../services/firebaseService';
 import { seedFakeRuns } from '../services/seedFakeRuns';
 import { loadRewards } from '../services/rewardService';
 import { loadProfile, updateProfile } from '../services/profileService';
+import { auth } from '../firebase';
 import { AVATAR_BASES, COSMETICS, COSMETIC_CATEGORIES } from '../config/cosmetics';
 import { getProgressToNextLevel } from '../utils/leveling';
 import { theme } from '../theme';
@@ -55,10 +56,22 @@ export default function ProfileScreen() {
     useCallback(() => {
       let active = true;
       const load = async () => {
+        // Get current user ID from auth
+        const userId = auth?.currentUser?.uid;
+        
+        if (!userId) {
+          if (active) {
+            setProfile(null);
+            setProfileName('Runner');
+            setRuns([]);
+          }
+          return;
+        }
+
         const [rewards, loadedProfile, loadedRuns] = await Promise.all([
-          loadRewards(),
-          loadProfile(),
-          getUserRuns(undefined, { max: 5 }),
+          loadRewards(userId),
+          loadProfile(userId),
+          getUserRuns(userId, { max: 5 }),
         ]);
         if (!active) return;
         setXp(rewards.xp ?? 0);
@@ -74,7 +87,7 @@ export default function ProfileScreen() {
       return () => {
         active = false;
       };
-    }, [])
+    }, [auth?.currentUser?.uid])
   );
 
   const progress = getProgressToNextLevel(xp);
@@ -97,9 +110,12 @@ export default function ProfileScreen() {
   const isUnlocked = useCallback((item) => xp >= (item?.xpRequired ?? 0), [xp]);
 
   const updateProfilePatch = useCallback(async (patch) => {
+    const userId = auth?.currentUser?.uid;
+    if (!userId) return;
+    
     setIsSavingProfile(true);
     try {
-      const next = await updateProfile(patch);
+      const next = await updateProfile(patch, userId);
       setProfile(next);
       if (typeof next?.name === 'string') {
         setProfileName(next.name);

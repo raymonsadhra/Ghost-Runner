@@ -493,6 +493,12 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       setUser(u);
       setLoading(false);
+      // Clear any cached data when user changes
+      if (u) {
+        console.log('User signed in:', u.uid);
+      } else {
+        console.log('User signed out');
+      }
     });
     return unsubscribe;
   }, []);
@@ -505,6 +511,7 @@ export default function App() {
         <StatusBar barStyle="light-content" />
         {user ? (
           <Tab.Navigator
+            key={user.uid} // Force remount when user changes
             screenOptions={{
               headerShown: false,
               tabBarActiveTintColor: theme.colors.primary,
@@ -515,10 +522,26 @@ export default function App() {
               },
             }}
           >
-            <Tab.Screen name="HomeTab" component={HomeStack} options={{ headerShown: false }} />
-            <Tab.Screen name="LeaderboardTab" component={LeaderboardStack} options={{ headerShown: false }} />
-            <Tab.Screen name="FriendsTab" component={FriendsStack} options={{ headerShown: false }} />
-            <Tab.Screen name="ProfileTab" component={ProfileStack} options={{ headerShown: false }} />
+            <Tab.Screen 
+              name="HomeTab" 
+              component={HomeStack} 
+              options={{ headerShown: false }}
+            />
+            <Tab.Screen 
+              name="LeaderboardTab" 
+              component={LeaderboardStack} 
+              options={{ headerShown: false }}
+            />
+            <Tab.Screen 
+              name="FriendsTab" 
+              component={FriendsStack} 
+              options={{ headerShown: false }}
+            />
+            <Tab.Screen 
+              name="ProfileTab" 
+              component={ProfileStack} 
+              options={{ headerShown: false }}
+            />
           </Tab.Navigator>
         ) : (
           <LoginScreen />
