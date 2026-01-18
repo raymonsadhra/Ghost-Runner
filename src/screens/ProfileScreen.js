@@ -59,7 +59,7 @@ function getNextMilestoneMiles(distanceMiles) {
   return DISTANCE_MILESTONES_MILES[DISTANCE_MILESTONES_MILES.length - 1];
 }
 
-export default function ProfileScreen() {
+export default function ProfileScreen({ navigation }) {
   const [xp, setXp] = useState(0);
   const [badges, setBadges] = useState([]);
   const [unlocks, setUnlocks] = useState([]);
@@ -300,7 +300,15 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>This Week</Text>
+          <View style={styles.cardHeaderRow}>
+            <Text style={styles.cardTitle}>This Week</Text>
+            <TouchableOpacity
+              onPress={() => navigation?.navigate('Analytics')}
+              style={styles.analyticsButton}
+            >
+              <Text style={styles.analyticsButtonText}>View Analytics →</Text>
+            </TouchableOpacity>
+          </View>
           <View style={styles.weekRow}>
             <View style={styles.weekStat}>
               <Text style={styles.weekValue}>
@@ -765,5 +773,20 @@ const styles = StyleSheet.create({
   seedButtonText: {
     color: theme.colors.textMuted,
     fontWeight: '700',
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  analyticsButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  analyticsButtonText: {
+    color: theme.colors.primary,
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

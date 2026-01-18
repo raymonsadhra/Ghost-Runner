@@ -16,6 +16,7 @@ import GhostRunScreen from './src/screens/GhostRunScreen';
 import SummaryScreen from './src/screens/SummaryScreen';
 import RunHistoryScreen from './src/screens/RunHistoryScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
+import AnalyticsScreen from './src/screens/AnalyticsScreen';
 import LeaderboardScreen from './src/screens/LeaderboardScreen';
 import UserRunHistoryScreen from './src/screens/UserRunHistoryScreen';
 import FriendsScreen from './src/screens/FriendsScreen';
@@ -458,6 +459,7 @@ function ProfileStack() {
       }}
     >
       <Stack.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Analytics" component={AnalyticsScreen} options={{ title: 'Analytics' }} />
     </Stack.Navigator>
   );
 }
