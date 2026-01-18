@@ -17,6 +17,7 @@ import {
   acceptFriendRequest,
   declineFriendRequest,
   cancelFriendRequest,
+  unfriend,
 } from '../services/friendService';
 import OutsiderBackground from '../components/OutsiderBackground';
 
@@ -174,6 +175,23 @@ export default function FriendsScreen({ navigation }) {
     }
   };
 
+  const handleUnfriend = async (friendId, friendName) => {
+    try {
+      await unfriend(friendId);
+      setStatusTone('info');
+      setStatusMessage(`Removed ${friendName} from friends.`);
+      const [friendData, pendingData] = await Promise.all([
+        fetchFriends(),
+        fetchPendingRequests(),
+      ]);
+      setFriends(friendData);
+      setPendingRequests(pendingData);
+    } catch (error) {
+      setStatusTone('error');
+      setStatusMessage(error?.message || 'Could not remove friend.');
+    }
+  };
+
   return (
     <OutsiderBackground accent="blue">
       <SafeAreaView style={styles.safe}>
@@ -279,33 +297,41 @@ export default function FriendsScreen({ navigation }) {
             </View>
           ) : (
             friends.map((friend) => (
-              <TouchableOpacity
-                key={friend.id}
-                style={styles.friendCard}
-                onPress={() => {
-                  navigation.navigate('UserRunHistory', {
-                    userId: friend.id,
-                    userName: friend.displayName ?? friend.name ?? 'Runner',
-                  });
-                }}
-              >
-                <View style={styles.friendInfo}>
-                  <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>
-                      {friend.displayName.slice(0, 2).toUpperCase()}
-                    </Text>
-                  </View>
-                  <View style={styles.friendDetails}>
-                    <View style={styles.friendNameRow}>
-                      <Text style={styles.friendName}>{friend.displayName}</Text>
+              <View key={friend.id} style={styles.friendCard}>
+                <TouchableOpacity
+                  style={styles.friendInfoTouchable}
+                  onPress={() => {
+                    navigation.navigate('UserRunHistory', {
+                      userId: friend.id,
+                      userName: friend.displayName ?? friend.name ?? 'Runner',
+                    });
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.friendInfo}>
+                    <View style={styles.avatar}>
+                      <Text style={styles.avatarText}>
+                        {friend.displayName.slice(0, 2).toUpperCase()}
+                      </Text>
                     </View>
-                    <Text style={styles.friendMeta}>
-                      Last run: {formatRelativeTime(friend.lastRunAt)}
-                    </Text>
+                    <View style={styles.friendDetails}>
+                      <View style={styles.friendNameRow}>
+                        <Text style={styles.friendName}>{friend.displayName}</Text>
+                      </View>
+                      <Text style={styles.friendMeta}>
+                        Last run: {formatRelativeTime(friend.lastRunAt)}
+                      </Text>
+                    </View>
                   </View>
-                </View>
-                <Text style={styles.chevron}>›</Text>
-              </TouchableOpacity>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.removeButton}
+                  onPress={() => handleUnfriend(friend.id, friend.displayName)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.removeButtonText}>Remove</Text>
+                </TouchableOpacity>
+              </View>
             ))
           )}
         </View>
@@ -450,6 +476,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 3,
+    gap: 12,
+  },
+  friendInfoTouchable: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   friendInfo: {
     flex: 1,
@@ -488,10 +520,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
-  chevron: {
-    color: theme.colors.textMuted,
-    fontSize: 24,
-    fontWeight: '300',
+  removeButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 59, 48, 0.15)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 59, 48, 0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#FF3B30',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  removeButtonText: {
+    color: '#FF3B30',
+    fontSize: 12,
+    fontWeight: '700',
   },
   emptyCard: {
     backgroundColor: CARD_BG,

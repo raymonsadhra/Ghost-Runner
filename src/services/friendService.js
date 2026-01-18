@@ -262,6 +262,18 @@ export async function fetchPendingRequests() {
   return hydrated;
 }
 
+export async function unfriend(friendUserId) {
+  const currentUser = requireUser();
+  const currentUserId = currentUser.uid;
+  if (!friendUserId) return;
+
+  // Remove friend relationship from both users
+  await Promise.all([
+    deleteDoc(doc(db, 'Users', currentUserId, 'Friends', friendUserId)),
+    deleteDoc(doc(db, 'Users', friendUserId, 'Friends', currentUserId)),
+  ]);
+}
+
 export async function fetchFriends() {
   const currentUser = requireUser();
   const currentUserId = currentUser.uid;
