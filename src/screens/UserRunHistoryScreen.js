@@ -9,6 +9,8 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { getUserRuns } from '../services/firebaseService';
+import { formatDurationCompact } from '../utils/timeUtils';
+import { formatDistanceKmToMiles, calculatePacePerMile } from '../utils/distanceUtils';
 import { theme } from '../theme';
 import OutsiderBackground from '../components/OutsiderBackground';
 
@@ -33,16 +35,17 @@ function getRunTitle(run) {
 }
 
 function buildRunMeta(run, includeDate) {
-  const distanceKm = run.distanceKm ?? (run.distance ?? 0) / 1000;
-  const durationMin = run.durationMin ?? Math.floor((run.duration ?? 0) / 60);
-  const pace = distanceKm > 0 ? (run.duration ?? 0) / 60 / distanceKm : (run.pace ?? 0);
+  const distanceMeters = run.distance ?? (run.distanceKm ? run.distanceKm * 1000 : 0);
+  const durationSeconds = run.duration ?? (run.durationMin ?? 0) * 60;
+  const pace = calculatePacePerMile(durationSeconds, distanceMeters);
+  const distanceMiles = distanceMeters * 0.000621371;
   const parts = [];
   if (includeDate) {
     parts.push(formatDate(run.timestamp));
   }
-  parts.push(`${distanceKm.toFixed(2)} km`);
-  parts.push(`${durationMin} min`);
-  parts.push(`Pace ${pace.toFixed(2)} min/km`);
+  parts.push(`${distanceMiles.toFixed(2)} mi`);
+  parts.push(formatDurationCompact(durationSeconds));
+  parts.push(`Pace ${pace.toFixed(2)} min/mi`);
   return parts.join(' • ');
 }
 

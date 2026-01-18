@@ -14,6 +14,8 @@ import MapView, { Polyline } from 'react-native-maps';
 import { theme } from '../theme';
 import { updateRunName } from '../services/firebaseService';
 import { awardBossRewards } from '../services/rewardService';
+import { formatDurationCompact } from '../utils/timeUtils';
+import { formatDistanceMiles, calculatePacePerMile } from '../utils/distanceUtils';
 import OutsiderBackground from '../components/OutsiderBackground';
 
 const DEFAULT_REGION = {
@@ -123,19 +125,18 @@ export default function SummaryScreen({ navigation, route }) {
             <Text style={styles.title}>Run Complete</Text>
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
-              <Text style={styles.statValue}>{(distance / 1000).toFixed(2)}</Text>
-              <Text style={styles.statLabel}>km</Text>
+              <Text style={styles.statValue}>{formatDistanceMiles(distance).replace(' mi', '')}</Text>
+              <Text style={styles.statLabel}>mi</Text>
             </View>
             <View style={styles.statCard}>
               <Text style={styles.statValue}>
-                {Math.floor(duration / 60)}:
-                {(duration % 60).toString().padStart(2, '0')}
+                {formatDurationCompact(duration)}
               </Text>
               <Text style={styles.statLabel}>time</Text>
             </View>
             <View style={styles.statCard}>
               <Text style={styles.statValue}>{pace.toFixed(2)}</Text>
-              <Text style={styles.statLabel}>min/km</Text>
+              <Text style={styles.statLabel}>min/mi</Text>
             </View>
           </View>
 

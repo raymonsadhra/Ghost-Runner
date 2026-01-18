@@ -12,6 +12,7 @@ import { theme } from '../theme';
 import { fetchFriends } from '../services/friendService';
 import { getUser } from '../services/firebaseService';
 import { auth } from '../firebase';
+import { formatDistanceKmToMiles } from '../utils/distanceUtils';
 import OutsiderBackground from '../components/OutsiderBackground';
 
 const CARD_BG = theme.colors.surfaceElevated;
@@ -40,7 +41,7 @@ export default function LeaderboardScreen({ navigation }) {
             id: friend.id,
             userId: friend.id,
             name: friend.displayName ?? friend.name ?? 'Runner',
-            distance: (friend.totalDistance ?? 0) / 1000,
+            distance: (friend.totalDistance ?? 0) * 0.000621371, // Convert meters to miles
             runs: friend.totalRuns ?? 0,
             isCurrentUser: false,
           }));
@@ -52,7 +53,7 @@ export default function LeaderboardScreen({ navigation }) {
               id: currentUserId,
               userId: currentUserId,
               name: currentUser.name ?? currentUser.displayName ?? 'You',
-              distance: (currentUser.totalDistance ?? 0) / 1000,
+              distance: (currentUser.totalDistance ?? 0) * 0.000621371, // Convert meters to miles
               runs: currentUser.totalRuns ?? 0,
               isCurrentUser: true,
             };
@@ -208,7 +209,7 @@ export default function LeaderboardScreen({ navigation }) {
                     {entry.isCurrentUser ? 'You' : entry.name}
                   </Text>
                   <Text style={styles.userStats}>
-                    {entry.runs} runs • {entry.distance.toFixed(1)} km
+                    {entry.runs} runs • {entry.distance.toFixed(1)} mi
                   </Text>
                 </View>
               </View>
@@ -217,7 +218,7 @@ export default function LeaderboardScreen({ navigation }) {
                   <Text style={styles.distanceValue}>
                     {entry.distance.toFixed(1)}
                   </Text>
-                  <Text style={styles.distanceLabel}>km</Text>
+                  <Text style={styles.distanceLabel}>mi</Text>
                 </View>
                 <Text style={styles.chevron}>›</Text>
               </View>

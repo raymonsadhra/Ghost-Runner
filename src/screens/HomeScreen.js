@@ -12,7 +12,9 @@ import { useFocusEffect } from '@react-navigation/native';
 import { theme } from '../theme';
 import { getUserRuns } from '../services/firebaseService';
 import { auth } from '../firebase';
-import { DEFAULT_WEEKLY_GOAL_KM, loadWeeklyGoal, saveWeeklyGoal } from '../services/goalService';
+import { formatDurationCompact } from '../utils/timeUtils';
+import { formatDistanceKmToMiles, calculatePacePerMile } from '../utils/distanceUtils';
+import { DEFAULT_WEEKLY_GOAL_MILES, loadWeeklyGoal, saveWeeklyGoal } from '../services/goalService';
 import OutsiderBackground from '../components/OutsiderBackground';
 
 const CARD_BG = theme.colors.surfaceElevated;
@@ -32,8 +34,8 @@ function getWeekStart(timestamp) {
 export default function HomeScreen({ navigation }) {
   const [runs, setRuns] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [goalKm, setGoalKm] = useState(DEFAULT_WEEKLY_GOAL_KM);
-  const [selectedGoalKm, setSelectedGoalKm] = useState(DEFAULT_WEEKLY_GOAL_KM);
+  const [goalMiles, setGoalMiles] = useState(DEFAULT_WEEKLY_GOAL_MILES);
+  const [selectedGoalMiles, setSelectedGoalMiles] = useState(DEFAULT_WEEKLY_GOAL_MILES);
   const [isSavingGoal, setIsSavingGoal] = useState(false);
 
   useFocusEffect(
@@ -80,8 +82,8 @@ export default function HomeScreen({ navigation }) {
     const loadGoal = async () => {
       const storedGoal = await loadWeeklyGoal();
       if (active) {
-        setGoalKm(storedGoal);
-        setSelectedGoalKm(storedGoal);
+        setGoalMiles(storedGoal);
+        setSelectedGoalMiles(storedGoal);
       }
     };
 
@@ -94,13 +96,13 @@ export default function HomeScreen({ navigation }) {
   const summary = useMemo(() => {
     const weekStart = getWeekStart(Date.now());
     const weekRuns = runs.filter((run) => (run.timestamp ?? 0) >= weekStart);
-    const distance = weekRuns.reduce((sum, run) => {
+    const distanceMeters = weekRuns.reduce((sum, run) => {
       // Use distanceKm if available, otherwise convert distance from meters
       const runDistance = run.distanceKm ? run.distanceKm * 1000 : (run.distance ?? 0);
       return sum + runDistance;
     }, 0);
     return {
-      distanceKm: distance / 1000,
+      distanceMiles: distanceMeters * 0.000621371,
       count: weekRuns.length,
       prs: 0,
     };
@@ -111,9 +113,9 @@ export default function HomeScreen({ navigation }) {
     () => Array.from({ length: 50 }, (_, index) => index + 1),
     []
   );
-  const progressKm = Math.min(goalKm, summary.distanceKm);
-  const progressPercent = goalKm > 0 ? progressKm / goalKm : 0;
-  const isGoalCurrent = selectedGoalKm === goalKm;
+  const progressMiles = Math.min(goalMiles, summary.distanceMiles);
+  const progressPercent = goalMiles > 0 ? progressMiles / goalMiles : 0;
+  const isGoalCurrent = selectedGoalMiles === goalMiles;
 
   const handleSetGoal = async () => {
     if (isGoalCurrent || isSavingGoal) {
@@ -121,8 +123,8 @@ export default function HomeScreen({ navigation }) {
     }
     setIsSavingGoal(true);
     try {
-      const nextGoal = await saveWeeklyGoal(selectedGoalKm);
-      setGoalKm(nextGoal);
+      const nextGoal = await saveWeeklyGoal(selectedGoalMiles);
+      setGoalMiles(nextGoal);
     } finally {
       setIsSavingGoal(false);
     }
@@ -172,9 +174,9 @@ export default function HomeScreen({ navigation }) {
           <View style={styles.goalCard}>
             <View style={styles.goalIcon} />
             <View style={styles.goalContent}>
-              <Text style={styles.goalTitle}>{goalKm} km per week</Text>
+              <Text style={styles.goalTitle}>{goalMiles} mi per week</Text>
               <Text style={styles.goalMeta}>
-                {progressKm.toFixed(1)} km / {goalKm} km run
+                {progressMiles.toFixed(1)} mi / {goalMiles} mi run
               </Text>
               <View style={styles.goalProgress}>
                 <View
@@ -204,11 +206,11 @@ export default function HomeScreen({ navigation }) {
             >
               <View style={styles.goalScaleLine} pointerEvents="none" />
               {goalOptions.map((value) => {
-                const isActive = value === selectedGoalKm;
+                const isActive = value === selectedGoalMiles;
                 return (
                   <TouchableOpacity
                     key={value}
-                    onPress={() => setSelectedGoalKm(value)}
+                    onPress={() => setSelectedGoalMiles(value)}
                     style={styles.goalTick}
                   >
                     <Text style={[styles.goalTickText, isActive && styles.goalTickTextActive]}>
@@ -269,9 +271,10 @@ export default function HomeScreen({ navigation }) {
             </View>
           ) : (
             recentRuns.map((run) => {
-              const distanceKm = run.distanceKm || (run.distance ?? 0) / 1000;
-              const durationMin = run.durationMin || Math.floor((run.duration ?? 0) / 60);
-              const pace = run.pace || (distanceKm > 0 && durationMin > 0 ? (durationMin / distanceKm).toFixed(2) : '0.00');
+              const distanceMeters = run.distance ?? (run.distanceKm ? run.distanceKm * 1000 : 0);
+              const durationSeconds = run.duration ?? (run.durationMin ?? 0) * 60;
+              const pace = calculatePacePerMile(durationSeconds, distanceMeters);
+              const distanceMiles = distanceMeters * 0.000621371;
               return (
                 <View key={run.id} style={styles.runCard}>
                   <Text style={styles.runTitle}>
@@ -279,7 +282,7 @@ export default function HomeScreen({ navigation }) {
                       new Date(run.timestamp ?? Date.now()).toLocaleDateString()}
                   </Text>
                   <Text style={styles.runMeta}>
-                    {distanceKm.toFixed(2)} km • {durationMin} min • {pace} min/km
+                    {distanceMiles.toFixed(2)} mi • {formatDurationCompact(durationSeconds)} • {pace.toFixed(2)} min/mi
                   </Text>
                 </View>
               );

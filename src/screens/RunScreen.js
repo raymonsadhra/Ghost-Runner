@@ -5,6 +5,8 @@ import MapView, { Polyline } from 'react-native-maps';
 
 import { LocationTracker } from '../services/LocationTracker';
 import { calculateTotalDistance } from '../utils/geoUtils';
+import { formatDurationCompact } from '../utils/timeUtils';
+import { formatDistanceMiles, calculatePacePerMile } from '../utils/distanceUtils';
 import { saveRun } from '../services/firebaseService';
 import { createBossGhostIfEligible } from '../services/bossGhostService';
 import { awardRunXp } from '../services/rewardService';
@@ -52,7 +54,7 @@ export default function RunScreen({ navigation }) {
   const [distance, setDistance] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
-  const pace = distance > 0 ? (duration / 60) / (distance / 1000) : 0;
+  const pace = calculatePacePerMile(duration, distance);
 
   const handlePoint = useCallback((point, allPoints) => {
     setPoints([...allPoints]);
@@ -165,19 +167,19 @@ export default function RunScreen({ navigation }) {
         <View style={styles.stats}>
           <View style={styles.statBlock}>
             <Text style={styles.statLabel}>Distance</Text>
-            <Text style={styles.statValue}>{(distance / 1000).toFixed(2)} km</Text>
+            <Text style={styles.statValue}>{formatDistanceMiles(distance).replace(' mi', '')}</Text>
+            <Text style={styles.statLabel}>mi</Text>
           </View>
           <View style={styles.statBlock}>
             <Text style={styles.statLabel}>Time</Text>
             <Text style={styles.statValue}>
-              {Math.floor(duration / 60)}:
-              {(duration % 60).toString().padStart(2, '0')}
+              {formatDurationCompact(duration)}
             </Text>
           </View>
           <View style={styles.statBlock}>
             <Text style={styles.statLabel}>Pace</Text>
             <Text style={styles.statValue}>
-              {pace > 0 ? pace.toFixed(2) : '0.00'} /km
+              {pace > 0 ? pace.toFixed(2) : '0.00'} /mi
             </Text>
           </View>
         </View>

@@ -16,6 +16,8 @@ import { getUser, getUserRuns } from '../services/firebaseService';
 import { seedFakeRuns } from '../services/seedFakeRuns';
 import { loadRewards } from '../services/rewardService';
 import { loadProfile, updateProfile } from '../services/profileService';
+import { formatDurationCompact } from '../utils/timeUtils';
+import { formatDistanceMiles, kmToMiles } from '../utils/distanceUtils';
 import { AVATAR_BASES, COSMETICS, COSMETIC_CATEGORIES } from '../config/cosmetics';
 import { getProgressToNextLevel } from '../utils/leveling';
 import { theme } from '../theme';
@@ -24,7 +26,7 @@ import OutsiderBackground from '../components/OutsiderBackground';
 const CARD_BG = theme.colors.surfaceElevated;
 const CARD_BORDER = 'rgba(255, 255, 255, 0.08)';
 const MUTED_TEXT = theme.colors.textMuted;
-const DISTANCE_MILESTONES_KM = [10, 25, 50, 100, 250, 500, 1000];
+const DISTANCE_MILESTONES_MILES = [6, 15, 31, 62, 155, 311, 621]; // Equivalent to [10, 25, 50, 100, 250, 500, 1000] km
 const POLL_INTERVAL_MS = 10000;
 
 function formatBadgeLabel(badgeId) {
@@ -50,11 +52,11 @@ function formatJoinDate(value) {
   return date.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
 }
 
-function getNextMilestoneKm(distanceKm) {
-  for (const milestone of DISTANCE_MILESTONES_KM) {
-    if (distanceKm <= milestone) return milestone;
+function getNextMilestoneMiles(distanceMiles) {
+  for (const milestone of DISTANCE_MILESTONES_MILES) {
+    if (distanceMiles <= milestone) return milestone;
   }
-  return DISTANCE_MILESTONES_KM[DISTANCE_MILESTONES_KM.length - 1];
+  return DISTANCE_MILESTONES_MILES[DISTANCE_MILESTONES_MILES.length - 1];
 }
 
 export default function ProfileScreen() {
@@ -67,7 +69,7 @@ export default function ProfileScreen() {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
   const [runs, setRuns] = useState([]);
-  const [totalDistanceKm, setTotalDistanceKm] = useState(0);
+  const [totalDistanceMiles, setTotalDistanceMiles] = useState(0);
   const [joinLabel, setJoinLabel] = useState(null);
 
   useFocusEffect(
@@ -106,7 +108,7 @@ export default function ProfileScreen() {
                   (sum, run) => sum + (run.distance ?? 0),
                   0
                 );
-          setTotalDistanceKm(totalMeters / 1000);
+          setTotalDistanceMiles(totalMeters * 0.000621371);
           setJoinLabel(formatJoinDate(userDoc?.createdAt));
         } catch (error) {
           if (!active) return;
@@ -131,10 +133,10 @@ export default function ProfileScreen() {
   const nextLevelDelta = progress.nextLevelXp - xp;
   const currentOutfit = profile?.outfit ?? {};
   const selectedBase = profile?.base ?? AVATAR_BASES[0]?.id;
-  const milestoneKm = getNextMilestoneKm(totalDistanceKm);
+  const milestoneMiles = getNextMilestoneMiles(totalDistanceMiles);
   const progressToMilestone =
-    milestoneKm > 0 ? Math.min(totalDistanceKm / milestoneKm, 1) : 0;
-  const distanceLabel = `${totalDistanceKm.toFixed(1)} km`;
+    milestoneMiles > 0 ? Math.min(totalDistanceMiles / milestoneMiles, 1) : 0;
+  const distanceLabel = `${totalDistanceMiles.toFixed(1)} mi`;
 
   const weekSummary = useMemo(() => {
     const weekStart = getWeekStart(Date.now());
@@ -142,7 +144,7 @@ export default function ProfileScreen() {
     const distance = weekRuns.reduce((sum, run) => sum + (run.distance ?? 0), 0);
     const duration = weekRuns.reduce((sum, run) => sum + (run.duration ?? 0), 0);
     return {
-      distanceKm: distance / 1000,
+      distanceMiles: distance * 0.000621371,
       durationMin: Math.floor(duration / 60),
       count: weekRuns.length,
     };
@@ -276,7 +278,7 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.insightRow}>
             <Text style={styles.insightValue}>{distanceLabel}</Text>
-            <Text style={styles.insightTarget}>Goal {milestoneKm} km</Text>
+            <Text style={styles.insightTarget}>Goal {milestoneMiles} mi</Text>
           </View>
           <View style={styles.insightTrack}>
             <LinearGradient
@@ -302,9 +304,9 @@ export default function ProfileScreen() {
           <View style={styles.weekRow}>
             <View style={styles.weekStat}>
               <Text style={styles.weekValue}>
-                {weekSummary.distanceKm.toFixed(2)}
+                {weekSummary.distanceMiles.toFixed(2)}
               </Text>
-              <Text style={styles.weekLabel}>km</Text>
+              <Text style={styles.weekLabel}>mi</Text>
             </View>
             <View style={styles.weekStat}>
               <Text style={styles.weekValue}>{weekSummary.durationMin}</Text>
@@ -452,8 +454,8 @@ export default function ProfileScreen() {
                     new Date(run.timestamp ?? Date.now()).toLocaleDateString()}
                 </Text>
                 <Text style={styles.activityMeta}>
-                  {(run.distanceKm ?? (run.distance ?? 0) / 1000).toFixed(2)} km •{' '}
-                  {Math.floor((run.duration ?? 0) / 60)} min
+                  {formatDistanceMiles(run.distance ?? (run.distanceKm ? run.distanceKm * 1000 : 0)).replace(' mi', '')} mi •{' '}
+                  {formatDurationCompact(run.duration ?? 0)}
                 </Text>
               </View>
             ))
