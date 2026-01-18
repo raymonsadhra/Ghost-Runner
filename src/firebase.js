@@ -1,5 +1,7 @@
+// firebase.js
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || '',
@@ -10,8 +12,11 @@ const firebaseConfig = {
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || '',
 };
 
+// Initialize Firebase App
 const app = initializeApp(firebaseConfig);
 
+// Firestore
 export const db = getFirestore(app);
-// Auth is optional for now; using null keeps the app running without RN auth setup.
-export const auth = null;
+
+// Auth (Expo-compatible - web SDK handles persistence automatically)
+export const auth = getAuth(app);
