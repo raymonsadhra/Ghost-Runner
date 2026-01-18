@@ -1,6 +1,6 @@
 import React from 'react';
 import { StatusBar, Text, Platform, StyleSheet, View } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { BottomTabBar } from '@react-navigation/bottom-tabs';
@@ -25,6 +25,18 @@ const Tab = createBottomTabNavigator();
 // Custom Glass Tab Bar Component
 function GlassTabBar(props) {
   const insets = useSafeAreaInsets();
+  
+  // Check if we should hide the tab bar based on current route
+  const state = props.state;
+  const route = state?.routes[state.index];
+  const nestedRouteName = getFocusedRouteNameFromRoute(route);
+  const hideTabBarRoutes = ['Run', 'GhostRun'];
+  const shouldHide = nestedRouteName && hideTabBarRoutes.includes(nestedRouteName);
+  
+  // If we should hide, return null to remove the entire tab bar including background
+  if (shouldHide) {
+    return null;
+  }
   
   if (Platform.OS === 'ios') {
     return (
@@ -209,32 +221,40 @@ export default function App() {
       <StatusBar barStyle="light-content" />
       <Tab.Navigator
         tabBar={(props) => <GlassTabBar {...props} />}
-        screenOptions={{
-          headerShown: false,
-          lazy: false,
-          tabBarStyle: {
-            backgroundColor: 'transparent',
-            borderTopWidth: 0,
-            elevation: 0,
-            shadowOpacity: 0,
-            paddingTop: Platform.OS === 'ios' ? 8 : 8,
-            paddingBottom: Platform.OS === 'ios' ? 0 : 8,
-            height: Platform.OS === 'ios' ? 60 : 60,
-          },
-          tabBarActiveTintColor: theme.colors.primary,
-          tabBarInactiveTintColor: 'rgba(143, 164, 191, 0.65)',
-          tabBarLabelStyle: {
-            fontSize: 10,
-            fontWeight: '600',
-            marginTop: 2,
-            letterSpacing: 0.2,
-          },
-          tabBarIconStyle: {
-            marginTop: 2,
-          },
-          tabBarItemStyle: {
-            paddingVertical: 4,
-          },
+        screenOptions={({ route }) => {
+          const routeName = getFocusedRouteNameFromRoute(route) ?? 'Home';
+          const hideTabBarRoutes = ['Run', 'GhostRun'];
+          const shouldHideTabBar = hideTabBarRoutes.includes(routeName);
+          
+          return {
+            headerShown: false,
+            lazy: false,
+            tabBarStyle: shouldHideTabBar
+              ? { display: 'none' }
+              : {
+                  backgroundColor: 'transparent',
+                  borderTopWidth: 0,
+                  elevation: 0,
+                  shadowOpacity: 0,
+                  paddingTop: Platform.OS === 'ios' ? 8 : 8,
+                  paddingBottom: Platform.OS === 'ios' ? 0 : 8,
+                  height: Platform.OS === 'ios' ? 60 : 60,
+                },
+            tabBarActiveTintColor: theme.colors.primary,
+            tabBarInactiveTintColor: 'rgba(143, 164, 191, 0.65)',
+            tabBarLabelStyle: {
+              fontSize: 10,
+              fontWeight: '600',
+              marginTop: 2,
+              letterSpacing: 0.2,
+            },
+            tabBarIconStyle: {
+              marginTop: 2,
+            },
+            tabBarItemStyle: {
+              paddingVertical: 4,
+            },
+          };
         }}
       >
         <Tab.Screen 
