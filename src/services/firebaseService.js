@@ -15,6 +15,7 @@ import {
 } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { deleteLocalRun, updateLocalRun } from './localRunStore';
+import { signOut as firebaseSignOut } from 'firebase/auth';
 
 function getUserId() {
   return auth?.currentUser?.uid ?? 'anon';
@@ -308,5 +309,19 @@ export async function testFirebaseConnection() {
     console.error('❌ Firebase test failed:', error);
     console.error('Error details:', error.message, error.code);
     return { success: false, error: error.message };
+  }
+}
+
+export async function signOut() {
+  if (!auth) {
+    throw new Error('Firebase Auth is not initialized.');
+  }
+
+  try {
+    await firebaseSignOut(auth);
+    console.log('User signed out successfully.');
+  } catch (error) {
+    console.error('Error signing out:', error);
+    throw error;
   }
 }

@@ -538,25 +538,49 @@ export default function App() {
               },
             }}
           >
-            <Tab.Screen 
-              name="HomeTab" 
-              component={HomeStack} 
-              options={{ headerShown: false }}
+            <Tab.Screen
+              name="HomeTab"
+              component={HomeStack}
+              options={{
+                headerShown: false,
+                tabBarLabel: 'Home',
+                tabBarIcon: ({ color }) => (
+                  <Text style={{ color, fontSize: 20 }}>🏠</Text>
+                ),
+              }}
             />
-            <Tab.Screen 
-              name="LeaderboardTab" 
-              component={LeaderboardStack} 
-              options={{ headerShown: false }}
+            <Tab.Screen
+              name="LeaderboardTab"
+              component={LeaderboardStack}
+              options={{
+                headerShown: false,
+                tabBarLabel: 'Leaderboards',
+                tabBarIcon: ({ color }) => (
+                  <Text style={{ color, fontSize: 20 }}>🏆</Text>
+                ),
+              }}
             />
-            <Tab.Screen 
-              name="FriendsTab" 
-              component={FriendsStack} 
-              options={{ headerShown: false }}
+            <Tab.Screen
+              name="FriendsTab"
+              component={FriendsStack}
+              options={{
+                headerShown: false,
+                tabBarLabel: 'Friends',
+                tabBarIcon: ({ color }) => (
+                  <Text style={{ color, fontSize: 20 }}>👥</Text>
+                ),
+              }}
             />
-            <Tab.Screen 
-              name="ProfileTab" 
-              component={ProfileStack} 
-              options={{ headerShown: false }}
+            <Tab.Screen
+              name="ProfileTab"
+              component={ProfileStack}
+              options={{
+                headerShown: false,
+                tabBarLabel: 'Profile',
+                tabBarIcon: ({ color }) => (
+                  <Text style={{ color, fontSize: 20 }}>👤</Text>
+                ),
+              }}
             />
           </Tab.Navigator>
         ) : (
