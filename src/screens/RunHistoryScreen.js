@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   SafeAreaView,
   View,
@@ -10,11 +10,13 @@ import {
   TextInput,
   Alert,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { getUserRuns, updateRunName, deleteRun } from '../services/firebaseService';
 import { theme } from '../theme';
 import OutsiderBackground from '../components/OutsiderBackground';
 
 const RUNS_LIMIT = 50;
+const POLL_INTERVAL_MS = 10000;
 
 function formatDate(timestamp) {
   return new Date(timestamp ?? Date.now()).toLocaleDateString();
@@ -46,44 +48,54 @@ export default function RunHistoryScreen() {
   const [editingRun, setEditingRun] = useState(null);
   const [editName, setEditName] = useState('');
   const [isSavingName, setIsSavingName] = useState(false);
+  const loadRunsRef = useRef(null);
 
-  const loadRuns = useCallback(async () => {
-    try {
-      const data = await getUserRuns(undefined, { max: RUNS_LIMIT });
-      setRuns(data);
-    } catch (error) {
-      setRuns([]);
-    }
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      let inFlight = false;
+      const load = async ({ showLoading = false } = {}) => {
+        if (inFlight) return;
+        inFlight = true;
+        if (showLoading) {
+          setIsLoading(true);
+        }
+        try {
+          const data = await getUserRuns(undefined, { max: RUNS_LIMIT });
+          if (active) {
+            setRuns(data);
+          }
+        } catch (error) {
+          if (active) {
+            setRuns([]);
+          }
+        } finally {
+          if (active && showLoading) {
+            setIsLoading(false);
+          }
+          inFlight = false;
+        }
+      };
 
-  useEffect(() => {
-    let active = true;
-    const load = async () => {
-      setIsLoading(true);
-      try {
-        const data = await getUserRuns(undefined, { max: RUNS_LIMIT });
-        if (active) {
-          setRuns(data);
-        }
-      } catch (error) {
-        if (active) {
-          setRuns([]);
-        }
-      } finally {
-        if (active) {
-          setIsLoading(false);
-        }
-      }
-    };
-    load();
-    return () => {
-      active = false;
-    };
-  }, []);
+      loadRunsRef.current = load;
+      load({ showLoading: true });
+      const intervalId = setInterval(() => {
+        void load();
+      }, POLL_INTERVAL_MS);
+      return () => {
+        active = false;
+        loadRunsRef.current = null;
+        clearInterval(intervalId);
+      };
+    }, [])
+  );
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await loadRuns();
+    const loadRuns = loadRunsRef.current;
+    if (loadRuns) {
+      await loadRuns();
+    }
     setIsRefreshing(false);
   };
 

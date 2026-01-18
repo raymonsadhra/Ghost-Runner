@@ -17,6 +17,7 @@ const PRIMARY_BLUE = theme.colors.neonPink;
 const CARD_BG = theme.colors.surfaceElevated;
 const CARD_BORDER = 'rgba(255, 255, 255, 0.08)';
 const MUTED_TEXT = theme.colors.textMuted;
+const POLL_INTERVAL_MS = 10000;
 
 function formatDate(timestamp) {
   return new Date(timestamp ?? Date.now()).toLocaleDateString(undefined, {
@@ -56,21 +57,28 @@ export default function UserRunHistoryScreen({ route, navigation }) {
   useFocusEffect(
     useCallback(() => {
       let active = true;
-      const load = async () => {
+      let inFlight = false;
+      const load = async ({ showLoading = false } = {}) => {
+        if (inFlight) return;
+        inFlight = true;
         if (!userId) {
           if (active) {
             setRuns([]);
             setError('No user selected');
             setIsLoading(false);
           }
+          inFlight = false;
           return;
         }
-        setIsLoading(true);
-        setError(null);
+        if (showLoading) {
+          setIsLoading(true);
+          setError(null);
+        }
         try {
           const data = await getUserRuns(userId, { max: RUNS_LIMIT });
           if (active) {
             setRuns(Array.isArray(data) ? data : []);
+            setError(null);
           }
         } catch (e) {
           if (active) {
@@ -79,12 +87,21 @@ export default function UserRunHistoryScreen({ route, navigation }) {
           }
         } finally {
           if (active) {
-            setIsLoading(false);
+            if (showLoading) {
+              setIsLoading(false);
+            }
           }
+          inFlight = false;
         }
       };
-      load();
-      return () => { active = false; };
+      load({ showLoading: true });
+      const intervalId = setInterval(() => {
+        void load();
+      }, POLL_INTERVAL_MS);
+      return () => {
+        active = false;
+        clearInterval(intervalId);
+      };
     }, [userId])
   );
 

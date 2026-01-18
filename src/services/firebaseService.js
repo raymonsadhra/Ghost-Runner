@@ -11,8 +11,10 @@ import {
   getDoc,
   updateDoc,
   serverTimestamp,
+  deleteDoc,
 } from 'firebase/firestore';
 import { db, auth } from '../firebase';
+import { deleteLocalRun, updateLocalRun } from './localRunStore';
 
 function getUserId() {
   return auth?.currentUser?.uid ?? 'anon';
@@ -188,39 +190,84 @@ export async function getUserRuns(userId = getUserId(), { max = 20 } = {}) {
   }
 }
 
-export async function updateRunName(runId, name, { localId = null, localOnly = false } = {}) {
+export async function updateRunName(
+  runId,
+  name,
+  { localId = null, localOnly = false, timeoutMs = 2500 } = {}
+) {
+  const trimmedName = name?.trim() || null;
+  const localTarget = localId ?? runId;
+
+  if (localOnly || runId?.startsWith('local-')) {
+    if (localTarget) {
+      await updateLocalRun(localTarget, { name: trimmedName });
+    }
+    return { success: true, localOnly: true };
+  }
+
+  if (localTarget) {
+    updateLocalRun(localTarget, { name: trimmedName }).catch(() => null);
+  }
+
   if (!hasFirebaseConfig()) {
     throw new Error('Firebase is not configured. Cannot update run name.');
   }
 
-  const userId = getUserId();
-  const trimmedName = name?.trim() || null;
-
-  // If it's a local-only run, we can't update it in Firebase
-  if (localOnly && !runId) {
-    console.log('Run is local-only, skipping Firebase update');
-    return { success: true, localOnly: true };
-  }
-
   try {
-    // Update in Firebase if we have a runId
     if (runId) {
-      const runRef = doc(db, 'Users', userId, 'Runs', runId);
-      await updateDoc(runRef, {
-        name: trimmedName,
-        updatedAt: serverTimestamp(),
-      });
+      const runRef = doc(db, 'Users', getUserId(), 'Runs', runId);
+      await withTimeout(
+        updateDoc(runRef, {
+          name: trimmedName,
+          updatedAt: serverTimestamp(),
+        }),
+        timeoutMs
+      );
       console.log(`Updated run name in Firebase: ${runId}`);
     }
-
-    // Note: If you have local storage, you might want to update it here too
-    // For now, we're only updating Firebase since local storage was removed
-
     return { success: true, id: runId };
   } catch (error) {
     console.error('Error updating run name:', error);
     if (error.code === 'permission-denied' || error.message?.includes('permission')) {
       throw new Error('Firestore permission denied. Cannot update run name.');
+    }
+    throw error;
+  }
+}
+
+export async function deleteRun(
+  runId,
+  { localId = null, localOnly = false, timeoutMs = 2500 } = {}
+) {
+  const deleteTargets = [runId, localId].filter(Boolean);
+
+  if (deleteTargets.length === 0) {
+    return { deleted: false, reason: 'missing-id' };
+  }
+
+  try {
+    await Promise.all(deleteTargets.map((id) => deleteLocalRun(id)));
+  } catch (error) {
+    // Ignore local failures; remote may still succeed.
+  }
+
+  if (localOnly || runId?.startsWith('local-')) {
+    return { deleted: true, source: 'local' };
+  }
+
+  if (!hasFirebaseConfig()) {
+    throw new Error('Firebase is not configured. Cannot delete run.');
+  }
+
+  try {
+    const runRef = doc(db, 'Users', getUserId(), 'Runs', runId);
+    await withTimeout(deleteDoc(runRef), timeoutMs);
+    console.log(`Deleted run in Firebase: ${runId}`);
+    return { deleted: true, source: 'remote' };
+  } catch (error) {
+    console.error('Error deleting run:', error);
+    if (error.code === 'permission-denied' || error.message?.includes('permission')) {
+      throw new Error('Firestore permission denied. Cannot delete run.');
     }
     throw error;
   }
