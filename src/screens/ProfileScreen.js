@@ -12,7 +12,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { getUser, getUserRuns } from '../services/firebaseService';
+import { getUser, getUserRuns, signOut } from '../services/firebaseService';
 import { seedFakeRuns } from '../services/seedFakeRuns';
 import { loadRewards } from '../services/rewardService';
 import { loadProfile, updateProfile } from '../services/profileService';
@@ -220,6 +220,12 @@ export default function ProfileScreen() {
       ]
     );
   }, []);
+
+  const handleLogout = () => {
+    signOut()
+      .then(() => Alert.alert('Logged out', 'You have been signed out successfully.'))
+      .catch((error) => Alert.alert('Logout failed', error.message));
+  };
 
   return (
     <OutsiderBackground accent="pink">
@@ -461,15 +467,8 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Developer</Text>
-          <TouchableOpacity
-            style={[styles.seedButton, isSeeding && styles.seedButtonDisabled]}
-            onPress={handleSeedFakeRuns}
-            disabled={isSeeding}
-          >
-            <Text style={styles.seedButtonText}>
-              {isSeeding ? 'Seeding…' : 'Seed fake runs to Firebase'}
-            </Text>
+          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+            <Text style={styles.logoutButtonText}>Logout</Text>
           </TouchableOpacity>
         </View>
         </ScrollView>
@@ -748,20 +747,15 @@ const styles = StyleSheet.create({
     color: MUTED_TEXT,
     marginTop: 4,
   },
-  seedButton: {
-    backgroundColor: theme.colors.surfaceElevated,
+  logoutButton: {
+    backgroundColor: theme.colors.neonPink,
     borderRadius: theme.radius.md,
     paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-    borderWidth: 1,
-    borderColor: CARD_BORDER,
     alignItems: 'center',
+    marginTop: theme.spacing.lg,
   },
-  seedButtonDisabled: {
-    opacity: 0.6,
-  },
-  seedButtonText: {
-    color: theme.colors.textMuted,
+  logoutButtonText: {
+    color: theme.colors.text,
     fontWeight: '700',
   },
 });
