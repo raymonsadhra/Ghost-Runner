@@ -1,14 +1,20 @@
-import { Audio } from 'expo-av';
+import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av';
 import * as Haptics from 'expo-haptics';
 
+const DEBUG_AUDIO = true;
+
 export class AudioManager {
-  constructor(sources = {}, { enableHaptics = true } = {}) {
+  constructor(sources = {}, { enableHaptics = true, debug = DEBUG_AUDIO } = {}) {
     this.sources = sources;
     this.enableHaptics = enableHaptics;
     this.alwaysOn = false;
     this.sounds = {};
     this.enabled = Object.values(sources).some(Boolean);
     this.lastHapticAt = 0;
+    this.debug = debug;
+    this.debugLogged = new Set();
+    this.playedKeys = new Set();
+    this.playStatusLogged = new Set();
     this.ready = this.init();
   }
 
@@ -16,12 +22,51 @@ export class AudioManager {
     this.alwaysOn = Boolean(value);
   }
 
+  log(message, data) {
+    if (!this.debug) return;
+    if (typeof data === 'undefined') {
+      console.log(`[Audio] ${message}`);
+    } else {
+      console.log(`[Audio] ${message}`, data);
+    }
+  }
+
+  logOnce(key, message, data) {
+    if (!this.debug) return;
+    if (this.debugLogged.has(key)) return;
+    this.debugLogged.add(key);
+    this.log(message, data);
+  }
+
   async init() {
     if (!this.enabled) return;
-    await Audio.setAudioModeAsync({
-      playsInSilentModeIOS: true,
-      staysActiveInBackground: true,
+    this.log('init start', {
+      enabled: this.enabled,
+      sources: Object.keys(this.sources),
     });
+    try {
+      await Audio.setIsEnabledAsync(true);
+      const audioMode = {
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: true,
+        interruptionModeIOS: InterruptionModeIOS.DoNotMix,
+        interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false,
+      };
+      this.log('audio mode set', audioMode);
+      await Audio.setAudioModeAsync(audioMode);
+      try {
+        const mode = await Audio.getAudioModeAsync();
+        this.log('audio mode', mode);
+      } catch (error) {
+        this.log('audio mode read failed', error?.message ?? error);
+      }
+    } catch (error) {
+      this.log('audio mode error', error?.message ?? error);
+      throw error;
+    }
 
     await this.loadSound('breathing', this.sources.breathing, { isLooping: true });
     await this.loadSound('footsteps', this.sources.footsteps, { isLooping: true });
@@ -31,16 +76,32 @@ export class AudioManager {
     });
     await this.loadSound('bossTheme', this.sources.bossTheme, { isLooping: true });
     await this.loadSound('cheer', this.sources.cheer, { isLooping: false });
+    this.log('init complete', { loaded: Object.keys(this.sounds) });
   }
 
   async loadSound(key, source, initialStatus) {
-    if (!source) return;
-    const { sound } = await Audio.Sound.createAsync(source, initialStatus);
-    this.sounds[key] = sound;
+    if (!source) {
+      this.logOnce(`missing:${key}`, `missing source for ${key}`);
+      return;
+    }
+    try {
+      const { sound } = await Audio.Sound.createAsync(source, initialStatus);
+      this.sounds[key] = sound;
+      this.logOnce(`loaded:${key}`, `loaded ${key}`);
+    } catch (error) {
+      this.logOnce(`error:${key}`, `failed to load ${key}`, error?.message ?? error);
+    }
   }
 
   async updateAudio(deltaMeters, { forceAmbient = this.alwaysOn } = {}) {
-    if (!this.enabled) return;
+    if (!this.enabled) {
+      this.logOnce('disabled', 'audio disabled: no sources configured');
+      return;
+    }
+    this.logOnce('update-start', 'updateAudio first call', {
+      deltaMeters,
+      forceAmbient,
+    });
     await this.ready;
 
     const distance = Math.abs(deltaMeters);
@@ -124,23 +185,53 @@ export class AudioManager {
 
   async playCheer() {
     const sound = this.sounds.cheer;
-    if (!sound) return;
-    await sound.replayAsync();
+    if (!sound) {
+      this.logOnce('missing:cheer', 'cheer sound missing');
+      return;
+    }
+    try {
+      await sound.replayAsync();
+      if (!this.playStatusLogged.has('cheer')) {
+        this.playStatusLogged.add('cheer');
+        const status = await sound.getStatusAsync();
+        this.log('cheer status', status);
+      }
+    } catch (error) {
+      this.log('cheer play error', error?.message ?? error);
+    }
   }
 
   async playLooped(key, volume, pan) {
     const sound = this.sounds[key];
-    if (!sound) return;
+    if (!sound) {
+      this.logOnce(`missing:${key}`, `sound not loaded for ${key}`);
+      return;
+    }
 
-    const status = await sound.getStatusAsync();
-    if (status.isLoaded) {
+    try {
+      const status = await sound.getStatusAsync();
+      if (!status.isLoaded) {
+        this.logOnce(`not-loaded:${key}`, `${key} not loaded yet`, status);
+        return;
+      }
       await sound.setVolumeAsync(volume);
       if (sound.setPanAsync) {
         await sound.setPanAsync(pan);
       }
       if (!status.isPlaying) {
+        if (!this.playedKeys.has(key)) {
+          this.playedKeys.add(key);
+          this.log(`playing ${key}`, { volume, pan });
+        }
         await sound.playAsync();
       }
+      if (!this.playStatusLogged.has(key)) {
+        this.playStatusLogged.add(key);
+        const after = await sound.getStatusAsync();
+        this.log(`${key} status`, after);
+      }
+    } catch (error) {
+      this.log(`playLooped error for ${key}`, error?.message ?? error);
     }
   }
 

@@ -10,8 +10,9 @@ import {
   Alert,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
 
-import { getUserRuns } from '../services/firebaseService';
+import { getUser, getUserRuns } from '../services/firebaseService';
 import { seedFakeRuns } from '../services/seedFakeRuns';
 import { loadRewards } from '../services/rewardService';
 import { loadProfile, updateProfile } from '../services/profileService';
@@ -23,6 +24,8 @@ import OutsiderBackground from '../components/OutsiderBackground';
 const CARD_BG = theme.colors.surfaceElevated;
 const CARD_BORDER = 'rgba(255, 255, 255, 0.08)';
 const MUTED_TEXT = theme.colors.textMuted;
+const DISTANCE_MILESTONES_KM = [10, 25, 50, 100, 250, 500, 1000];
+const POLL_INTERVAL_MS = 10000;
 
 function formatBadgeLabel(badgeId) {
   if (!badgeId) return 'Unknown';
@@ -40,6 +43,20 @@ function getWeekStart(timestamp) {
   return date.getTime();
 }
 
+function formatJoinDate(value) {
+  if (!value) return null;
+  const date = value?.toDate ? value.toDate() : new Date(value);
+  if (!Number.isFinite(date?.getTime?.())) return null;
+  return date.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+}
+
+function getNextMilestoneKm(distanceKm) {
+  for (const milestone of DISTANCE_MILESTONES_KM) {
+    if (distanceKm <= milestone) return milestone;
+  }
+  return DISTANCE_MILESTONES_KM[DISTANCE_MILESTONES_KM.length - 1];
+}
+
 export default function ProfileScreen() {
   const [xp, setXp] = useState(0);
   const [badges, setBadges] = useState([]);
@@ -50,15 +67,18 @@ export default function ProfileScreen() {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
   const [runs, setRuns] = useState([]);
+  const [totalDistanceKm, setTotalDistanceKm] = useState(0);
+  const [joinLabel, setJoinLabel] = useState(null);
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
-      const load = async () => {
-        const [rewards, loadedProfile, loadedRuns] = await Promise.all([
+      let inFlight = false;
+
+      const loadLocal = async () => {
+        const [rewards, loadedProfile] = await Promise.all([
           loadRewards(),
           loadProfile(),
-          getUserRuns(undefined, { max: 5 }),
         ]);
         if (!active) return;
         setXp(rewards.xp ?? 0);
@@ -67,12 +87,42 @@ export default function ProfileScreen() {
         setBossWins(rewards.bossWins ?? []);
         setProfile(loadedProfile);
         setProfileName(loadedProfile?.name ?? '');
-        setRuns(loadedRuns ?? []);
       };
 
-      load();
+      const loadRemote = async () => {
+        if (inFlight) return;
+        inFlight = true;
+        try {
+          const [loadedRuns, userDoc] = await Promise.all([
+            getUserRuns(undefined, { max: 5 }),
+            getUser().catch(() => null),
+          ]);
+          if (!active) return;
+          setRuns(loadedRuns ?? []);
+          const totalMeters =
+            typeof userDoc?.totalDistance === 'number'
+              ? userDoc.totalDistance
+              : (loadedRuns ?? []).reduce(
+                  (sum, run) => sum + (run.distance ?? 0),
+                  0
+                );
+          setTotalDistanceKm(totalMeters / 1000);
+          setJoinLabel(formatJoinDate(userDoc?.createdAt));
+        } catch (error) {
+          if (!active) return;
+        } finally {
+          inFlight = false;
+        }
+      };
+
+      void loadLocal();
+      void loadRemote();
+      const intervalId = setInterval(() => {
+        void loadRemote();
+      }, POLL_INTERVAL_MS);
       return () => {
         active = false;
+        clearInterval(intervalId);
       };
     }, [])
   );
@@ -81,6 +131,10 @@ export default function ProfileScreen() {
   const nextLevelDelta = progress.nextLevelXp - xp;
   const currentOutfit = profile?.outfit ?? {};
   const selectedBase = profile?.base ?? AVATAR_BASES[0]?.id;
+  const milestoneKm = getNextMilestoneKm(totalDistanceKm);
+  const progressToMilestone =
+    milestoneKm > 0 ? Math.min(totalDistanceKm / milestoneKm, 1) : 0;
+  const distanceLabel = `${totalDistanceKm.toFixed(1)} km`;
 
   const weekSummary = useMemo(() => {
     const weekStart = getWeekStart(Date.now());
@@ -211,6 +265,36 @@ export default function ProfileScreen() {
           <Text style={styles.progressMeta}>
             {xp} XP • {nextLevelDelta} XP to level {progress.level + 1}
           </Text>
+        </View>
+
+        <View style={styles.card}>
+          <View style={styles.insightHeader}>
+            <Text style={styles.cardTitle}>Lifetime Distance</Text>
+            <Text style={styles.insightMeta}>
+              {joinLabel ? `Since ${joinLabel}` : 'Since you started'}
+            </Text>
+          </View>
+          <View style={styles.insightRow}>
+            <Text style={styles.insightValue}>{distanceLabel}</Text>
+            <Text style={styles.insightTarget}>Goal {milestoneKm} km</Text>
+          </View>
+          <View style={styles.insightTrack}>
+            <LinearGradient
+              colors={[theme.colors.neonGreen, theme.colors.neonBlue]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={[
+                styles.insightFill,
+                { width: `${Math.round(progressToMilestone * 100)}%` },
+              ]}
+            />
+            <View
+              style={[
+                styles.insightDot,
+                { left: `${Math.round(progressToMilestone * 100)}%` },
+              ]}
+            />
+          </View>
         </View>
 
         <View style={styles.card}>
@@ -479,6 +563,54 @@ const styles = StyleSheet.create({
   progressMeta: {
     color: MUTED_TEXT,
     marginTop: theme.spacing.sm,
+  },
+  insightHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    marginBottom: theme.spacing.sm,
+  },
+  insightMeta: {
+    color: theme.colors.textMuted,
+    fontSize: 12,
+  },
+  insightRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginBottom: theme.spacing.sm,
+  },
+  insightValue: {
+    color: theme.colors.text,
+    fontSize: 22,
+    fontWeight: '700',
+  },
+  insightTarget: {
+    color: theme.colors.textMuted,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  insightTrack: {
+    height: 10,
+    borderRadius: theme.radius.pill,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  insightFill: {
+    height: '100%',
+    borderRadius: theme.radius.pill,
+  },
+  insightDot: {
+    position: 'absolute',
+    top: -5,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: theme.colors.neonGreen,
+    borderWidth: 2,
+    borderColor: theme.colors.text,
+    marginLeft: -9,
   },
   weekRow: {
     flexDirection: 'row',
