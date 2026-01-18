@@ -16,6 +16,8 @@ import {
   sendFriendRequest,
   acceptFriendRequest,
   declineFriendRequest,
+  cancelFriendRequest,
+  removeFriend,
 } from '../services/friendService';
 import OutsiderBackground from '../components/OutsiderBackground';
 
@@ -160,6 +162,32 @@ export default function FriendsScreen({ navigation }) {
     }
   };
 
+  const handleCancelRequest = async (requestId) => {
+    try {
+      await cancelFriendRequest(requestId);
+      setStatusTone('info');
+      setStatusMessage('Request cancelled.');
+      const pendingData = await fetchPendingRequests();
+      setPendingRequests(pendingData);
+    } catch (error) {
+      setStatusTone('error');
+      setStatusMessage(error?.message || 'Could not cancel request.');
+    }
+  };
+
+  const handleRemoveFriend = async (friendId) => {
+    try {
+      await removeFriend(friendId);
+      setStatusTone('info');
+      setStatusMessage('Friend removed.');
+      const friendData = await fetchFriends();
+      setFriends(friendData);
+    } catch (error) {
+      setStatusTone('error');
+      setStatusMessage(error?.message || 'Could not remove friend.');
+    }
+  };
+
   return (
     <OutsiderBackground accent="blue">
       <SafeAreaView style={styles.safe}>
@@ -221,7 +249,16 @@ export default function FriendsScreen({ navigation }) {
                     </Text>
                   </View>
                 </View>
-                {request.direction !== 'outgoing' && (
+                {request.direction === 'outgoing' ? (
+                  <View style={styles.requestActions}>
+                    <TouchableOpacity
+                      style={[styles.requestButton, styles.cancelButton]}
+                      onPress={() => handleCancelRequest(request.id)}
+                    >
+                      <Text style={styles.requestButtonText}>Cancel</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
                   <View style={styles.requestActions}>
                     <TouchableOpacity
                       style={[styles.requestButton, styles.acceptButton]}
@@ -279,7 +316,12 @@ export default function FriendsScreen({ navigation }) {
                     </Text>
                   </View>
                 </View>
-                <Text style={styles.chevron}>›</Text>
+                <TouchableOpacity
+                  style={styles.removeButton}
+                  onPress={() => handleRemoveFriend(friend.id)}
+                >
+                  <Text style={styles.removeButtonText}>Remove</Text>
+                </TouchableOpacity>
               </TouchableOpacity>
             ))
           )}
@@ -397,6 +439,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: CARD_BORDER,
   },
+  cancelButton: {
+    backgroundColor: CARD_BG,
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+  },
   requestButtonText: {
     color: theme.colors.text,
     fontWeight: '700',
@@ -452,6 +499,19 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     fontSize: 24,
     fontWeight: '300',
+  },
+  removeButton: {
+    paddingVertical: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+    backgroundColor: CARD_BG,
+  },
+  removeButtonText: {
+    color: theme.colors.textMuted,
+    fontWeight: '600',
+    fontSize: 12,
   },
   emptyCard: {
     backgroundColor: CARD_BG,
