@@ -10,38 +10,67 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { theme } from '../theme';
+import {
+  fetchFriends,
+  fetchPendingRequests,
+  sendFriendRequest,
+  acceptFriendRequest,
+  declineFriendRequest,
+} from '../services/friendService';
 import OutsiderBackground from '../components/OutsiderBackground';
 
 const CARD_BG = theme.colors.surfaceElevated;
 const CARD_BORDER = 'rgba(255, 255, 255, 0.08)';
 const MUTED_TEXT = theme.colors.textMuted;
+const POLL_INTERVAL_MS = 10000;
+
+function toDate(value) {
+  if (!value) return null;
+  if (value?.toDate) return value.toDate();
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function formatRelativeTime(value) {
+  const date = toDate(value);
+  if (!date) return 'No runs yet';
+  const deltaMs = Date.now() - date.getTime();
+  if (deltaMs < 60 * 1000) return 'just now';
+  const minutes = Math.floor(deltaMs / (60 * 1000));
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
 
 export default function FriendsScreen({ navigation }) {
   const [friends, setFriends] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [statusMessage, setStatusMessage] = useState(null);
+  const [statusTone, setStatusTone] = useState('info');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
-      const loadFriends = async () => {
-        setIsLoading(true);
+      let inFlight = false;
+      const loadFriendsData = async ({ showLoading = false } = {}) => {
+        if (inFlight) return;
+        inFlight = true;
+        if (showLoading) {
+          setIsLoading(true);
+        }
         try {
-          // TODO: Implement friends data fetching from Firebase
-          // For now, using mock data
-          const mockFriends = [
-            { id: '1', name: 'Friend 1', status: 'active', lastRun: '2h ago' },
-            { id: '2', name: 'Friend 2', status: 'active', lastRun: '5h ago' },
-            { id: '3', name: 'Friend 3', status: 'away', lastRun: '1d ago' },
-          ];
-          const mockPending = [
-            { id: '4', name: 'User 4', sent: false },
-            { id: '5', name: 'User 5', sent: true },
-          ];
+          const [friendData, pendingData] = await Promise.all([
+            fetchFriends(),
+            fetchPendingRequests(),
+          ]);
           if (active) {
-            setFriends(mockFriends);
-            setPendingRequests(mockPending);
+            setFriends(friendData);
+            setPendingRequests(pendingData);
           }
         } catch (error) {
           if (active) {
@@ -49,32 +78,86 @@ export default function FriendsScreen({ navigation }) {
             setPendingRequests([]);
           }
         } finally {
-          if (active) {
+          if (active && showLoading) {
             setIsLoading(false);
           }
+          inFlight = false;
         }
       };
 
-      loadFriends();
+      loadFriendsData({ showLoading: true });
+      const intervalId = setInterval(() => {
+        void loadFriendsData();
+      }, POLL_INTERVAL_MS);
       return () => {
         active = false;
+        clearInterval(intervalId);
       };
     }, [])
   );
 
-  const handleAddFriend = () => {
-    // TODO: Implement add friend functionality
-    console.log('Add friend:', searchQuery);
+  const handleAddFriend = async () => {
+    if (!searchQuery.trim() || isSubmitting) return;
+    setIsSubmitting(true);
+    setStatusMessage(null);
+    try {
+      const result = await sendFriendRequest(searchQuery);
+      if (result.status === 'already_friends') {
+        setStatusTone('info');
+        setStatusMessage('You are already friends with that user.');
+      } else if (result.status === 'incoming_request') {
+        setStatusTone('info');
+        setStatusMessage('That user already sent you a request.');
+      } else if (result.status === 'already_requested') {
+        setStatusTone('info');
+        setStatusMessage('Friend request already sent.');
+      } else {
+        setStatusTone('success');
+        setStatusMessage('Friend request sent.');
+      }
+      setSearchQuery('');
+      const [friendData, pendingData] = await Promise.all([
+        fetchFriends(),
+        fetchPendingRequests(),
+      ]);
+      setFriends(friendData);
+      setPendingRequests(pendingData);
+    } catch (error) {
+      setStatusTone('error');
+      setStatusMessage(error?.message || 'Could not send request.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleAcceptRequest = (requestId) => {
-    // TODO: Implement accept friend request
-    console.log('Accept request:', requestId);
+  const handleAcceptRequest = async (requestId) => {
+    try {
+      await acceptFriendRequest(requestId);
+      setStatusTone('success');
+      setStatusMessage('Friend added.');
+      const [friendData, pendingData] = await Promise.all([
+        fetchFriends(),
+        fetchPendingRequests(),
+      ]);
+      setFriends(friendData);
+      setPendingRequests(pendingData);
+    } catch (error) {
+      setStatusTone('error');
+      setStatusMessage(error?.message || 'Could not accept request.');
+    }
   };
 
-  const handleDeclineRequest = (requestId) => {
-    // TODO: Implement decline friend request
-    console.log('Decline request:', requestId);
+  const handleDeclineRequest = async (requestId) => {
+    try {
+      await declineFriendRequest(requestId);
+      setStatusTone('info');
+      setStatusMessage('Request declined.');
+      const pendingData = await fetchPendingRequests();
+      setPendingRequests(pendingData);
+    } catch (error) {
+      setStatusTone('error');
+      setStatusMessage(error?.message || 'Could not decline request.');
+    }
   };
 
   return (
@@ -90,7 +173,7 @@ export default function FriendsScreen({ navigation }) {
           <View style={styles.searchContainer}>
             <TextInput
               style={styles.searchInput}
-              placeholder="Search by username..."
+              placeholder="Email, username, or user id..."
               placeholderTextColor={MUTED_TEXT}
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -98,10 +181,24 @@ export default function FriendsScreen({ navigation }) {
             <TouchableOpacity
               style={styles.searchButton}
               onPress={handleAddFriend}
+              disabled={isSubmitting}
             >
-              <Text style={styles.searchButtonText}>Add</Text>
+              <Text style={styles.searchButtonText}>
+                {isSubmitting ? 'Sending...' : 'Add'}
+              </Text>
             </TouchableOpacity>
           </View>
+          {statusMessage ? (
+            <Text
+              style={[
+                styles.statusMessage,
+                statusTone === 'error' && styles.statusError,
+                statusTone === 'success' && styles.statusSuccess,
+              ]}
+            >
+              {statusMessage}
+            </Text>
+          ) : null}
         </View>
 
         {pendingRequests.length > 0 && (
@@ -112,17 +209,19 @@ export default function FriendsScreen({ navigation }) {
                 <View style={styles.requestInfo}>
                   <View style={styles.avatar}>
                     <Text style={styles.avatarText}>
-                      {request.name.slice(0, 2).toUpperCase()}
+                      {request.displayName.slice(0, 2).toUpperCase()}
                     </Text>
                   </View>
                   <View style={styles.requestDetails}>
-                    <Text style={styles.requestName}>{request.name}</Text>
+                    <Text style={styles.requestName}>{request.displayName}</Text>
                     <Text style={styles.requestMeta}>
-                      {request.sent ? 'Request sent' : 'Wants to be friends'}
+                      {request.direction === 'outgoing'
+                        ? 'Request sent'
+                        : 'Wants to be friends'}
                     </Text>
                   </View>
                 </View>
-                {!request.sent && (
+                {request.direction !== 'outgoing' && (
                   <View style={styles.requestActions}>
                     <TouchableOpacity
                       style={[styles.requestButton, styles.acceptButton]}
@@ -168,23 +267,15 @@ export default function FriendsScreen({ navigation }) {
                 <View style={styles.friendInfo}>
                   <View style={styles.avatar}>
                     <Text style={styles.avatarText}>
-                      {friend.name.slice(0, 2).toUpperCase()}
+                      {friend.displayName.slice(0, 2).toUpperCase()}
                     </Text>
                   </View>
                   <View style={styles.friendDetails}>
                     <View style={styles.friendNameRow}>
-                      <Text style={styles.friendName}>{friend.name}</Text>
-                      <View
-                        style={[
-                          styles.statusIndicator,
-                          friend.status === 'active'
-                            ? styles.statusActive
-                            : styles.statusAway,
-                        ]}
-                      />
+                      <Text style={styles.friendName}>{friend.displayName}</Text>
                     </View>
                     <Text style={styles.friendMeta}>
-                      Last run: {friend.lastRun}
+                      Last run: {formatRelativeTime(friend.lastRunAt)}
                     </Text>
                   </View>
                 </View>
@@ -250,6 +341,16 @@ const styles = StyleSheet.create({
   searchButtonText: {
     color: theme.colors.text,
     fontWeight: '700',
+  },
+  statusMessage: {
+    marginTop: theme.spacing.sm,
+    color: theme.colors.textMuted,
+  },
+  statusError: {
+    color: theme.colors.danger,
+  },
+  statusSuccess: {
+    color: theme.colors.neonGreen,
   },
   requestCard: {
     backgroundColor: CARD_BG,
@@ -336,23 +437,11 @@ const styles = StyleSheet.create({
   friendNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.sm,
   },
   friendName: {
     color: theme.colors.text,
     fontSize: 16,
     fontWeight: '600',
-  },
-  statusIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  statusActive: {
-    backgroundColor: theme.colors.neonGreen,
-  },
-  statusAway: {
-    backgroundColor: theme.colors.textMuted,
   },
   friendMeta: {
     color: theme.colors.textMuted,
