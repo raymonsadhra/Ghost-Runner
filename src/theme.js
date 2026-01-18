@@ -1,12 +1,12 @@
 export const theme = {
   colors: {
-    ink: '#0F141B',
-    mist: '#E9F2F4',
-    slate: '#2B3A42',
-    primary: '#FF6B35',
-    secondary: '#2EC4B6',
-    accent: '#FFD166',
-    danger: '#EF476F',
+    ink: '#0B0F17',
+    mist: '#E8F0FF',
+    slate: '#18243A',
+    primary: '#2F6BFF',
+    secondary: '#3BA4FF',
+    accent: '#7FB2FF',
+    danger: '#FF5D5D',
   },
   spacing: {
     xs: 6,

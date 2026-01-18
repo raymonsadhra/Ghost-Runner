@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   SafeAreaView,
   View,
@@ -7,8 +7,15 @@ import {
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { theme } from '../theme';
 import { getUserRuns } from '../services/firebaseService';
+
+const PRIMARY_BLUE = '#2F6BFF';
+const DARK_BG = '#0B0F17';
+const CARD_BG = '#121A2A';
+const CARD_BORDER = '#1E2A3C';
+const MUTED_TEXT = '#8FA4BF';
 
 function getWeekStart(timestamp) {
   const date = new Date(timestamp);
@@ -22,30 +29,33 @@ export default function HomeScreen({ navigation }) {
   const [runs, setRuns] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    let active = true;
-    const loadRuns = async () => {
-      try {
-        const data = await getUserRuns();
-        if (active) {
-          setRuns(data);
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      const loadRuns = async () => {
+        setIsLoading(true);
+        try {
+          const data = await getUserRuns();
+          if (active) {
+            setRuns(data);
+          }
+        } catch (error) {
+          if (active) {
+            setRuns([]);
+          }
+        } finally {
+          if (active) {
+            setIsLoading(false);
+          }
         }
-      } catch (error) {
-        if (active) {
-          setRuns([]);
-        }
-      } finally {
-        if (active) {
-          setIsLoading(false);
-        }
-      }
-    };
+      };
 
-    loadRuns();
-    return () => {
-      active = false;
-    };
-  }, []);
+      loadRuns();
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
 
   const summary = useMemo(() => {
     const weekStart = getWeekStart(Date.now());
@@ -59,62 +69,103 @@ export default function HomeScreen({ navigation }) {
   }, [runs]);
 
   const recentRuns = runs.slice(0, 3);
+  const goalKm = 10;
+  const progressKm = Math.min(goalKm, summary.distanceKm);
+  const progressPercent = goalKm > 0 ? progressKm / goalKm : 0;
 
   return (
     <SafeAreaView style={styles.safe}>
-      <View style={styles.background}>
-        <View style={[styles.orb, styles.orbOne]} />
-        <View style={[styles.orb, styles.orbTwo]} />
-        <View style={[styles.orb, styles.orbThree]} />
-      </View>
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.kicker}>Ghost Runner</Text>
-        <Text style={styles.title}>Race your past.</Text>
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <TouchableOpacity style={styles.iconButton}>
+              <Text style={styles.iconText}>+</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.iconButton}>
+              <Text style={styles.iconText}>?</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.headerTitle}>Home</Text>
+          <View style={styles.headerRight}>
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={() => navigation.navigate('Profile')}
+            >
+              <Text style={styles.iconText}>Me</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
-        <View style={styles.actions}>
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Suggested Goal</Text>
+            <TouchableOpacity>
+              <Text style={styles.sectionLink}>Customize</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.goalCard}>
+            <View style={styles.goalIcon} />
+            <View style={styles.goalContent}>
+              <Text style={styles.goalTitle}>{goalKm} km per week</Text>
+              <Text style={styles.goalMeta}>
+                {progressKm.toFixed(1)} km / {goalKm} km run
+              </Text>
+              <View style={styles.goalProgress}>
+                <View
+                  style={[
+                    styles.goalProgressFill,
+                    { width: `${Math.round(progressPercent * 100)}%` },
+                  ]}
+                />
+              </View>
+            </View>
+            <TouchableOpacity style={styles.goalButton}>
+              <Text style={styles.goalButtonText}>Set Goal</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.readyTitle}>Ready to get moving?</Text>
+          <Text style={styles.readyMeta}>
+            Choose a run and hit start. Your stats will be waiting.
+          </Text>
           <TouchableOpacity
-            style={[styles.actionCard, styles.primaryCard]}
+            style={styles.primaryAction}
             onPress={() => navigation.navigate('Run')}
           >
-            <Text style={styles.actionTitle}>Start New Run</Text>
-            <Text style={styles.actionSubtitle}>Track a fresh route</Text>
+            <Text style={styles.primaryActionText}>Record an Activity</Text>
           </TouchableOpacity>
-
           <TouchableOpacity
-            style={[styles.actionCard, styles.secondaryCard]}
+            style={styles.secondaryAction}
             onPress={() => navigation.navigate('GhostSelect')}
           >
-            <Text style={styles.actionTitle}>Race a Ghost</Text>
-            <Text style={styles.actionSubtitle}>Chase your fastest self</Text>
+            <Text style={styles.secondaryActionText}>Race a Ghost</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>This Week</Text>
-          <View style={styles.statsRow}>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>
-                {summary.distanceKm.toFixed(1)}
-              </Text>
-              <Text style={styles.statLabel}>km</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>{summary.count}</Text>
-              <Text style={styles.statLabel}>runs</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>{summary.prs}</Text>
-              <Text style={styles.statLabel}>prs</Text>
+          <Text style={styles.sectionTitle}>Suggested Challenges</Text>
+          <Text style={styles.sectionMetaText}>
+            Make accountability more fun and earn rewards.
+          </Text>
+          <View style={styles.challengeCard}>
+            <Text style={styles.challengeTitle}>December 5K Challenge</Text>
+            <Text style={styles.challengeMeta}>
+              Chase your best 5K run and claim a digital trophy.
+            </Text>
+            <View style={styles.challengeBadge}>
+              <Text style={styles.challengeBadgeText}>Digital Trophy</Text>
             </View>
           </View>
         </View>
 
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
+          <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>Recent Runs</Text>
-            <Text style={styles.sectionMeta}>
-              {isLoading ? 'Loading...' : `${runs.length} total`}
-            </Text>
+            <TouchableOpacity onPress={() => navigation.navigate('RunHistory')}>
+              <Text style={styles.sectionLink}>View all</Text>
+            </TouchableOpacity>
           </View>
           {recentRuns.length === 0 && !isLoading ? (
             <View style={styles.emptyCard}>
@@ -126,7 +177,8 @@ export default function HomeScreen({ navigation }) {
             recentRuns.map((run) => (
               <View key={run.id} style={styles.runCard}>
                 <Text style={styles.runTitle}>
-                  {new Date(run.timestamp ?? Date.now()).toLocaleDateString()}
+                  {run.name?.trim() ||
+                    new Date(run.timestamp ?? Date.now()).toLocaleDateString()}
                 </Text>
                 <Text style={styles.runMeta}>
                   {(run.distance / 1000).toFixed(2)} km •{' '}
@@ -144,82 +196,52 @@ export default function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: theme.colors.ink,
-  },
-  background: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  orb: {
-    position: 'absolute',
-    borderRadius: 999,
-    opacity: 0.2,
-  },
-  orbOne: {
-    width: 260,
-    height: 260,
-    backgroundColor: theme.colors.secondary,
-    top: -80,
-    left: -40,
-  },
-  orbTwo: {
-    width: 320,
-    height: 320,
-    backgroundColor: theme.colors.primary,
-    bottom: -120,
-    right: -80,
-  },
-  orbThree: {
-    width: 180,
-    height: 180,
-    backgroundColor: theme.colors.accent,
-    top: 220,
-    right: -60,
+    backgroundColor: DARK_BG,
   },
   container: {
     padding: theme.spacing.lg,
     paddingBottom: theme.spacing.xl,
   },
-  kicker: {
-    color: theme.colors.accent,
-    fontSize: 14,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    marginBottom: theme.spacing.sm,
-  },
-  title: {
-    color: theme.colors.mist,
-    fontSize: 32,
-    fontWeight: '800',
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: theme.spacing.lg,
   },
-  actions: {
-    marginBottom: theme.spacing.xl,
+  headerLeft: {
+    flexDirection: 'row',
+    flex: 1,
   },
-  actionCard: {
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.lg,
-    marginBottom: theme.spacing.md,
+  headerRight: {
+    flex: 1,
+    alignItems: 'flex-end',
   },
-  primaryCard: {
-    backgroundColor: theme.colors.primary,
-  },
-  secondaryCard: {
-    backgroundColor: theme.colors.secondary,
-  },
-  actionTitle: {
-    color: theme.colors.ink,
-    fontSize: 20,
+  headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 18,
     fontWeight: '700',
+    color: theme.colors.mist,
   },
-  actionSubtitle: {
-    color: theme.colors.ink,
-    opacity: 0.8,
-    marginTop: theme.spacing.xs,
+  iconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: CARD_BG,
+    marginRight: theme.spacing.sm,
+  },
+  iconText: {
+    color: theme.colors.mist,
+    fontWeight: '700',
+    fontSize: 12,
   },
   section: {
     marginBottom: theme.spacing.xl,
   },
-  sectionHeader: {
+  sectionHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -230,36 +252,130 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
   },
-  sectionMeta: {
-    color: theme.colors.mist,
-    opacity: 0.6,
+  sectionLink: {
+    color: PRIMARY_BLUE,
+    fontWeight: '600',
   },
-  statsRow: {
+  sectionMetaText: {
+    color: MUTED_TEXT,
+    marginBottom: theme.spacing.md,
+  },
+  goalCard: {
+    backgroundColor: CARD_BG,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.lg,
     flexDirection: 'row',
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: '#1E262E',
-    borderRadius: theme.radius.md,
-    padding: theme.spacing.md,
     alignItems: 'center',
-    marginRight: theme.spacing.sm,
   },
-  statValue: {
+  goalIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#1E2A3C',
+    marginRight: theme.spacing.md,
+  },
+  goalContent: {
+    flex: 1,
+  },
+  goalTitle: {
+    color: theme.colors.mist,
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  goalMeta: {
+    color: MUTED_TEXT,
+    marginTop: 4,
+  },
+  goalProgress: {
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: CARD_BORDER,
+    marginTop: theme.spacing.sm,
+    overflow: 'hidden',
+  },
+  goalProgressFill: {
+    height: '100%',
+    backgroundColor: PRIMARY_BLUE,
+  },
+  goalButton: {
+    backgroundColor: PRIMARY_BLUE,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: 12,
+    marginLeft: theme.spacing.md,
+  },
+  goalButtonText: {
+    color: 'white',
+    fontWeight: '700',
+  },
+  readyTitle: {
     color: theme.colors.mist,
     fontSize: 22,
     fontWeight: '700',
+    marginBottom: theme.spacing.sm,
   },
-  statLabel: {
+  readyMeta: {
+    color: MUTED_TEXT,
+    marginBottom: theme.spacing.md,
+  },
+  primaryAction: {
+    backgroundColor: PRIMARY_BLUE,
+    borderRadius: theme.radius.lg,
+    paddingVertical: theme.spacing.md,
+    alignItems: 'center',
+    marginBottom: theme.spacing.sm,
+  },
+  primaryActionText: {
+    color: 'white',
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  secondaryAction: {
+    backgroundColor: CARD_BG,
+    borderRadius: theme.radius.lg,
+    paddingVertical: theme.spacing.md,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+  },
+  secondaryActionText: {
     color: theme.colors.mist,
-    opacity: 0.6,
-    marginTop: 2,
+    fontWeight: '600',
+  },
+  challengeCard: {
+    backgroundColor: CARD_BG,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.lg,
+  },
+  challengeTitle: {
+    color: theme.colors.mist,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  challengeMeta: {
+    color: MUTED_TEXT,
+    marginTop: 6,
+  },
+  challengeBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#1C2B4D',
+    borderRadius: 10,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 4,
+    marginTop: theme.spacing.sm,
+  },
+  challengeBadgeText: {
+    color: '#A9C4FF',
+    fontWeight: '700',
+    fontSize: 12,
   },
   runCard: {
-    backgroundColor: '#1B222A',
+    backgroundColor: CARD_BG,
     borderRadius: theme.radius.md,
     padding: theme.spacing.md,
     marginBottom: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
   },
   runTitle: {
     color: theme.colors.mist,
@@ -267,17 +383,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   runMeta: {
-    color: theme.colors.mist,
-    opacity: 0.7,
+    color: MUTED_TEXT,
     marginTop: 4,
   },
   emptyCard: {
-    backgroundColor: '#1B222A',
+    backgroundColor: CARD_BG,
     borderRadius: theme.radius.md,
     padding: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
   },
   emptyText: {
-    color: theme.colors.mist,
-    opacity: 0.7,
+    color: MUTED_TEXT,
   },
 });

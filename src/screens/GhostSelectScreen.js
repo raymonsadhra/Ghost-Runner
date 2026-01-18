@@ -5,25 +5,42 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
-import { getUserRuns } from '../services/firebaseService';
+import { deleteRun, getUserRuns } from '../services/firebaseService';
+import {
+  createBossGhostIfEligible,
+  deleteBossGhost,
+  getBossGhosts,
+} from '../services/bossGhostService';
 import { theme } from '../theme';
 
 export default function GhostSelectScreen({ navigation }) {
   const [runs, setRuns] = useState([]);
+  const [bossGhosts, setBossGhosts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
     const loadRuns = async () => {
       try {
-        const data = await getUserRuns();
+        const [runsData, bossData] = await Promise.all([
+          getUserRuns(),
+          getBossGhosts(),
+        ]);
+        let nextBossData = bossData;
+        if (bossData.length === 0 && runsData.length >= 5) {
+          await createBossGhostIfEligible();
+          nextBossData = await getBossGhosts();
+        }
         if (active) {
-          setRuns(data);
+          setRuns(runsData);
+          setBossGhosts(nextBossData);
         }
       } catch (error) {
         if (active) {
           setRuns([]);
+          setBossGhosts([]);
         }
       } finally {
         if (active) {
@@ -38,26 +55,82 @@ export default function GhostSelectScreen({ navigation }) {
     };
   }, []);
 
+  const handleDelete = (item) => {
+    Alert.alert(
+      'Delete this ghost?',
+      item.type === 'boss'
+        ? 'This boss ghost will be removed.'
+        : 'This run will be removed.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            if (item.type === 'boss') {
+              await deleteBossGhost(item.id, {
+                localId: item.localId,
+                localOnly: item.localOnly,
+              });
+              setBossGhosts((prev) => prev.filter((ghost) => ghost.id !== item.id));
+            } else {
+              await deleteRun(item.id, {
+                localId: item.localId,
+                localOnly: item.localOnly,
+              });
+              setRuns((prev) => prev.filter((run) => run.id !== item.id));
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const renderRun = ({ item }) => {
     const distanceKm = (item.distance ?? 0) / 1000;
     const durationMin = Math.floor((item.duration ?? 0) / 60);
     const pace = distanceKm > 0 ? (item.duration / 60) / distanceKm : 0;
+    const isBoss = item.type === 'boss';
+    const bossPalette = item.character?.palette;
+    const bossAccent = bossPalette?.primary ?? theme.colors.primary;
 
     return (
       <TouchableOpacity
-        style={styles.card}
+        style={[
+          styles.card,
+          isBoss && styles.bossCard,
+          isBoss && bossPalette?.secondary
+            ? { backgroundColor: bossPalette.secondary }
+            : null,
+        ]}
         onPress={() =>
           navigation.navigate('GhostRun', {
-            ghostRoute: item.points,
+            ghostRoute: item.route ?? item.points,
             ghostMeta: item,
           })
         }
       >
         <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle}>
-            {new Date(item.timestamp ?? Date.now()).toLocaleDateString()}
+          <Text
+            style={[
+              styles.cardTitle,
+              isBoss ? { color: theme.colors.mist } : null,
+            ]}
+          >
+            {item.name?.trim() ||
+              new Date(item.timestamp ?? Date.now()).toLocaleDateString()}
           </Text>
-          <Text style={styles.cardBadge}>Ghost</Text>
+          <Text
+            style={[
+              styles.cardBadge,
+              isBoss && styles.bossBadge,
+              isBoss && bossPalette?.primary
+                ? { backgroundColor: bossPalette.primary }
+                : null,
+            ]}
+          >
+            {isBoss ? 'Boss' : 'Ghost'}
+          </Text>
         </View>
         <Text style={styles.cardMeta}>
           {distanceKm.toFixed(2)} km • {durationMin} min
@@ -65,9 +138,24 @@ export default function GhostSelectScreen({ navigation }) {
         <Text style={styles.cardMeta}>
           Pace {pace.toFixed(2)} min/km
         </Text>
+        {isBoss && (
+          <Text style={[styles.bossMeta, { color: bossAccent }]}>
+            {item.character?.title ?? 'Milestone boss battle'}
+          </Text>
+        )}
+        <View style={styles.cardActions}>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.deleteButton]}
+            onPress={() => handleDelete(item)}
+          >
+            <Text style={styles.actionText}>Delete</Text>
+          </TouchableOpacity>
+        </View>
       </TouchableOpacity>
     );
   };
+
+  const ghostOptions = [...bossGhosts, ...runs];
 
   return (
     <View style={styles.container}>
@@ -76,7 +164,7 @@ export default function GhostSelectScreen({ navigation }) {
         <Text style={styles.loading}>Loading runs...</Text>
       ) : (
         <FlatList
-          data={runs}
+          data={ghostOptions}
           renderItem={renderRun}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
@@ -116,10 +204,16 @@ const styles = StyleSheet.create({
     paddingBottom: theme.spacing.xl,
   },
   card: {
-    backgroundColor: '#1D242C',
+    backgroundColor: '#121A2A',
     borderRadius: theme.radius.lg,
     padding: theme.spacing.lg,
     marginBottom: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: '#1E2A3C',
+  },
+  bossCard: {
+    borderWidth: 1,
+    borderColor: 'rgba(47, 107, 255, 0.6)',
   },
   cardHeader: {
     flexDirection: 'row',
@@ -133,7 +227,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   cardBadge: {
-    color: theme.colors.ink,
+    color: theme.colors.mist,
     backgroundColor: theme.colors.accent,
     paddingHorizontal: theme.spacing.sm,
     paddingVertical: 4,
@@ -141,15 +235,40 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 12,
   },
+  bossBadge: {
+    backgroundColor: theme.colors.primary,
+  },
   cardMeta: {
     color: theme.colors.mist,
     opacity: 0.7,
     marginTop: 4,
   },
+  bossMeta: {
+    color: theme.colors.accent,
+    marginTop: theme.spacing.sm,
+    fontWeight: '600',
+  },
+  cardActions: {
+    marginTop: theme.spacing.md,
+  },
+  actionButton: {
+    borderRadius: theme.radius.md,
+    paddingVertical: theme.spacing.sm,
+    alignItems: 'center',
+  },
+  deleteButton: {
+    backgroundColor: theme.colors.danger,
+  },
+  actionText: {
+    color: theme.colors.mist,
+    fontWeight: '700',
+  },
   emptyCard: {
-    backgroundColor: '#1D242C',
+    backgroundColor: '#121A2A',
     borderRadius: theme.radius.lg,
     padding: theme.spacing.lg,
+    borderWidth: 1,
+    borderColor: '#1E2A3C',
   },
   emptyText: {
     color: theme.colors.mist,

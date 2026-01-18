@@ -26,6 +26,10 @@ export class AudioManager {
     await this.loadSound('breathing', this.sources.breathing, { isLooping: true });
     await this.loadSound('footsteps', this.sources.footsteps, { isLooping: true });
     await this.loadSound('heartbeat', this.sources.heartbeat, { isLooping: true });
+    await this.loadSound('ghostDistant', this.sources.ghostDistant, {
+      isLooping: true,
+    });
+    await this.loadSound('bossTheme', this.sources.bossTheme, { isLooping: true });
     await this.loadSound('cheer', this.sources.cheer, { isLooping: false });
   }
 
@@ -40,6 +44,11 @@ export class AudioManager {
     await this.ready;
 
     const distance = Math.abs(deltaMeters);
+    if (forceAmbient) {
+      const ghostVolume = Math.max(0.12, Math.min(0.6, 0.6 - distance / 120));
+      const ghostPan = deltaMeters < 0 ? -0.2 : 0.2;
+      await this.playGhostDistant(ghostVolume, ghostPan);
+    }
 
     if (deltaMeters < -50) {
       if (forceAmbient) {
@@ -88,6 +97,7 @@ export class AudioManager {
   }
 
   async playAmbient() {
+    await this.playGhostDistant(0.25, 0);
     await this.playBreathing(0.35, 0);
     await this.playFootsteps(0.25, 0);
   }
@@ -102,6 +112,14 @@ export class AudioManager {
 
   async playHeartbeat(volume) {
     await this.playLooped('heartbeat', volume, 0);
+  }
+
+  async playGhostDistant(volume, pan) {
+    await this.playLooped('ghostDistant', volume, pan);
+  }
+
+  async playBossTheme(volume) {
+    await this.playLooped('bossTheme', volume, 0);
   }
 
   async playCheer() {
